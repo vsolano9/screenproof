@@ -121,7 +121,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
     metadata: fastlane/metadata
 ```
 
-(The `@v0` tag resolves once the first release is published; pin an exact `@v0.x.y` tag for reproducible CI.)
+(Pin an exact `@v0.x.y` tag for reproducible CI.)
 
 ## Flat mode
 

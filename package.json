@@ -40,6 +40,14 @@
   ],
   "author": "TheChosenVictor LLC",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vsolano9/screenproof.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vsolano9/screenproof/issues"
+  },
+  "homepage": "https://github.com/vsolano9/screenproof#readme",
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"
