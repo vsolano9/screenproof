@@ -33,10 +33,16 @@ function isJpeg(buf: Uint8Array): boolean {
   return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8;
 }
 
+/** Legal PNG colour types (spec: 0 gray, 2 RGB, 3 palette, 4 gray+alpha, 6 RGBA). */
+const PNG_COLOR_TYPES: ReadonlySet<number> = new Set([0, 2, 3, 4, 6]);
+
 function parsePng(buf: Uint8Array): ParseResult {
-  // Signature (8) + IHDR length (4) + "IHDR" (4) + 13 data bytes = 29 bytes;
-  // the fields we need end at byte 25 (colour type).
-  if (buf.length < 26) return { ok: false, reason: "truncated PNG (no IHDR)" };
+  // Signature (8) + IHDR length (4) + "IHDR" (4) + 13 data bytes = 29 bytes.
+  // Require the complete IHDR data, not just the fields we read.
+  if (buf.length < 29) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
+  if (readU32BE(buf, 8) !== 13) {
+    return { ok: false, reason: "invalid PNG: IHDR length is not 13" };
+  }
   if (
     buf[12] !== 0x49 || // I
     buf[13] !== 0x48 || // H
@@ -52,6 +58,9 @@ function parsePng(buf: Uint8Array): ParseResult {
 
   if (width === 0 || height === 0 || width > MAX_DIMENSION || height > MAX_DIMENSION) {
     return { ok: false, reason: `corrupt PNG: implausible dimensions ${width}x${height}` };
+  }
+  if (!PNG_COLOR_TYPES.has(colorType)) {
+    return { ok: false, reason: `corrupt PNG: invalid color type ${colorType}` };
   }
 
   const hasAlpha = colorType === 4 || colorType === 6;
@@ -88,7 +97,9 @@ function parseJpeg(buf: Uint8Array): ParseResult {
 
     if (isSofMarker(marker)) {
       // Segment layout after the marker: length (2), precision (1),
-      // height (2), width (2).
+      // height (2), width (2). The declared length must cover those five
+      // payload bytes; do not read past what the segment claims to contain.
+      if (segmentLength < 7) return { ok: false, reason: "invalid JPEG frame header length" };
       if (j + 7 >= buf.length) return { ok: false, reason: "truncated JPEG (frame header)" };
       const height = readU16BE(buf, j + 4);
       const width = readU16BE(buf, j + 6);

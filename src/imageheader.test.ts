@@ -106,3 +106,35 @@ test("PNG signature constant matches the real signature", () => {
   const png = makePng(1, 1);
   assert.deepEqual(Array.from(png.slice(0, 8)), Array.from(PNG_SIGNATURE));
 });
+
+// Peer-review regressions (2026-07-09): declared-length and IHDR validation.
+
+test("rejects a JPEG frame header with an implausible declared segment length", () => {
+  // SOF0 declaring segment length 2: too short to contain precision+height+width.
+  const bytes = new Uint8Array([
+    0xff, 0xd8,
+    0xff, 0xc0, 0x00, 0x02, 0x08, 0x01, 0x00, 0x01, 0x00, 0x01, 0x01, 0x11, 0x00,
+    0xff, 0xd9,
+  ]);
+  const reason = expectFail(bytes);
+  assert.match(reason, /invalid JPEG frame header length/);
+});
+
+test("rejects a PNG truncated inside the IHDR data", () => {
+  const reason = expectFail(makePng(10, 10).slice(0, 27));
+  assert.match(reason, /truncated PNG/);
+});
+
+test("rejects a PNG whose IHDR declares the wrong length", () => {
+  const png = Uint8Array.from(makePng(10, 10));
+  png.set(new Uint8Array([0x00, 0x00, 0x00, 0x0c]), 8); // 12 instead of 13
+  const reason = expectFail(png);
+  assert.match(reason, /invalid PNG: IHDR length/);
+});
+
+test("rejects an illegal PNG color type", () => {
+  const png = Uint8Array.from(makePng(10, 10));
+  png[25] = 7; // not one of 0, 2, 3, 4, 6
+  const reason = expectFail(png);
+  assert.match(reason, /invalid color type/);
+});
