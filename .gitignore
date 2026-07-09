@@ -1,0 +1,66 @@
+# --- Dependencies & build output ---
+node_modules/
+coverage/
+dist/
+build/
+*.tsbuildinfo
+
+# --- Logs & OS / editor cruft ---
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Secrets & credentials (never publish) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.p8
+*.cer
+*.crt
+*.der
+*.keystore
+*.jks
+*.mobileprovision
+*.provisionprofile
+AuthKey_*.p8
+id_rsa*
+id_ed25519*
+*.pkcs8
+.npmrc
+.netrc
+secrets/
+.secrets/
+credentials.json
+*.credentials
+*_secret*
+*.secret
+
+# --- AI / agent tooling & internal workspace notes (keep private) ---
+# This is a public repo. Nothing about our agent harness, prompts, or
+# internal planning should ever be committed here.
+.claude/
+.claude.json
+.codex/
+.cursor/
+.aider*
+.continue/
+.windsurf/
+.agent-harness/
+.agent-bridge/
+.oneshot/
+.loopx/
+.mcp.json
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
+_journal/
+_planning/
+memory/

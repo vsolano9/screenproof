@@ -1,0 +1,47 @@
+{
+  "name": "screenproof",
+  "version": "0.1.0",
+  "description": "Lint your iOS App Store screenshots (a fastlane deliver screenshots folder or any image folder) against Apple's published size, format, and count rules before you submit. Offline, zero dependencies.",
+  "type": "module",
+  "bin": {
+    "screenproof": "dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "npm run typecheck && npm test",
+    "prepack": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "ios",
+    "app-store",
+    "app-store-connect",
+    "fastlane",
+    "deliver",
+    "screenshots",
+    "aso",
+    "linter",
+    "ci",
+    "validation"
+  ],
+  "author": "TheChosenVictor LLC",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
