@@ -1,0 +1,577 @@
+[
+  {
+    "id": "iphone-6.9",
+    "label": "iPhone 6.9-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1260,
+        "height": 2736
+      },
+      {
+        "width": 1290,
+        "height": 2796
+      },
+      {
+        "width": 1320,
+        "height": 2868
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2736,
+        "height": 1260
+      },
+      {
+        "width": 2796,
+        "height": 1290
+      },
+      {
+        "width": 2868,
+        "height": 1320
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-6.5",
+    "label": "iPhone 6.5-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1284,
+        "height": 2778
+      },
+      {
+        "width": 1242,
+        "height": 2688
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2778,
+        "height": 1284
+      },
+      {
+        "width": 2688,
+        "height": 1242
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-6.3",
+    "label": "iPhone 6.3-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1179,
+        "height": 2556
+      },
+      {
+        "width": 1206,
+        "height": 2622
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2556,
+        "height": 1179
+      },
+      {
+        "width": 2622,
+        "height": 1206
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-6.1",
+    "label": "iPhone 6.1-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1170,
+        "height": 2532
+      },
+      {
+        "width": 1125,
+        "height": 2436
+      },
+      {
+        "width": 1080,
+        "height": 2340
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2532,
+        "height": 1170
+      },
+      {
+        "width": 2436,
+        "height": 1125
+      },
+      {
+        "width": 2340,
+        "height": 1080
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-5.5",
+    "label": "iPhone 5.5-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1242,
+        "height": 2208
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2208,
+        "height": 1242
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-4.7",
+    "label": "iPhone 4.7-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 750,
+        "height": 1334
+      }
+    ],
+    "landscape": [
+      {
+        "width": 1334,
+        "height": 750
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-4.0",
+    "label": "iPhone 4-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 640,
+        "height": 1096
+      },
+      {
+        "width": 640,
+        "height": 1136
+      }
+    ],
+    "landscape": [
+      {
+        "width": 1136,
+        "height": 600
+      },
+      {
+        "width": 1136,
+        "height": 640
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "iphone-3.5",
+    "label": "iPhone 3.5-inch",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 640,
+        "height": 920
+      },
+      {
+        "width": 640,
+        "height": 960
+      }
+    ],
+    "landscape": [
+      {
+        "width": 960,
+        "height": 600
+      },
+      {
+        "width": 960,
+        "height": 640
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "ipad-13",
+    "label": "iPad 13-inch",
+    "platform": "ipad",
+    "portrait": [
+      {
+        "width": 2064,
+        "height": 2752
+      },
+      {
+        "width": 2048,
+        "height": 2732
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2752,
+        "height": 2064
+      },
+      {
+        "width": 2732,
+        "height": 2048
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "ipad-12.9",
+    "label": "iPad 12.9-inch (2nd generation)",
+    "platform": "ipad",
+    "portrait": [
+      {
+        "width": 2048,
+        "height": 2732
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2732,
+        "height": 2048
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "ipad-11",
+    "label": "iPad 11-inch",
+    "platform": "ipad",
+    "portrait": [
+      {
+        "width": 1488,
+        "height": 2266
+      },
+      {
+        "width": 1668,
+        "height": 2420
+      },
+      {
+        "width": 1668,
+        "height": 2388
+      },
+      {
+        "width": 1640,
+        "height": 2360
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2266,
+        "height": 1488
+      },
+      {
+        "width": 2420,
+        "height": 1668
+      },
+      {
+        "width": 2388,
+        "height": 1668
+      },
+      {
+        "width": 2360,
+        "height": 1640
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "ipad-10.5",
+    "label": "iPad 10.5-inch",
+    "platform": "ipad",
+    "portrait": [
+      {
+        "width": 1668,
+        "height": 2224
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2224,
+        "height": 1668
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "ipad-9.7",
+    "label": "iPad 9.7-inch",
+    "platform": "ipad",
+    "portrait": [
+      {
+        "width": 1536,
+        "height": 2008
+      },
+      {
+        "width": 1536,
+        "height": 2048
+      },
+      {
+        "width": 768,
+        "height": 1004
+      },
+      {
+        "width": 768,
+        "height": 1024
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2048,
+        "height": 1496
+      },
+      {
+        "width": 2048,
+        "height": 1536
+      },
+      {
+        "width": 1024,
+        "height": 748
+      },
+      {
+        "width": 1024,
+        "height": 768
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "mac",
+    "label": "Mac",
+    "platform": "mac",
+    "portrait": [],
+    "landscape": [
+      {
+        "width": 1280,
+        "height": 800
+      },
+      {
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "width": 2560,
+        "height": 1600
+      },
+      {
+        "width": 2880,
+        "height": 1800
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "appletv",
+    "label": "Apple TV",
+    "platform": "appletv",
+    "portrait": [],
+    "landscape": [
+      {
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "width": 3840,
+        "height": 2160
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "visionpro",
+    "label": "Apple Vision Pro",
+    "platform": "visionpro",
+    "portrait": [],
+    "landscape": [
+      {
+        "width": 3840,
+        "height": 2160
+      }
+    ],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-ultra3",
+    "label": "Apple Watch Ultra 3",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 422,
+        "height": 514
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-ultra",
+    "label": "Apple Watch Ultra/Ultra 2",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 410,
+        "height": 502
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-s10",
+    "label": "Apple Watch Series 10/11",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 416,
+        "height": 496
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-s7",
+    "label": "Apple Watch Series 7/8/9",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 396,
+        "height": 484
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-s4",
+    "label": "Apple Watch Series 4/5/6/SE",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 368,
+        "height": 448
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  },
+  {
+    "id": "watch-s3",
+    "label": "Apple Watch Series 3",
+    "platform": "watch",
+    "portrait": [
+      {
+        "width": 312,
+        "height": 390
+      }
+    ],
+    "landscape": [],
+    "verifiedOn": "2026-07-09",
+    "sources": [
+      "apple",
+      "deliver"
+    ]
+  }
+]
