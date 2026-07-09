@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "screenshot-primary-size-missing": "warning",
+    "screenshot-locale-parity": "warning",
+    "screenshot-png-alpha": "error"
+  },
+  "locales": {
+    "extra": [],
+    "ignore": ["archive"]
+  },
+  "dimensions": {
+    "iphone-6.9": {
+      "portrait": [[1260, 2736], [1290, 2796], [1320, 2868]],
+      "landscape": [[2736, 1260], [2796, 1290], [2868, 1320]]
+    }
+  }
+}

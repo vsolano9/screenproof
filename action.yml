@@ -1,0 +1,49 @@
+name: screenproof
+description: Lint iOS App Store screenshots (a fastlane deliver screenshots folder or any image folder) against Apple's size, format, and count rules.
+author: TheChosenVictor LLC
+branding:
+  icon: image
+  color: green
+
+inputs:
+  path:
+    description: Path to the screenshots folder to lint.
+    required: false
+    default: fastlane/screenshots
+  strict:
+    description: Fail on warnings as well as errors.
+    required: false
+    default: "false"
+  config:
+    description: Path to a screenproof.json config file (optional).
+    required: false
+    default: ""
+  metadata:
+    description: Path to a deliver metadata folder for the locale cross-check (optional).
+    required: false
+    default: ""
+  flat:
+    description: Treat the path as a flat folder of images.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+    - shell: bash
+      env:
+        SCREENPROOF_PATH: ${{ inputs.path }}
+        SCREENPROOF_STRICT: ${{ inputs.strict }}
+        SCREENPROOF_CONFIG: ${{ inputs.config }}
+        SCREENPROOF_METADATA: ${{ inputs.metadata }}
+        SCREENPROOF_FLAT: ${{ inputs.flat }}
+      run: |
+        args=("$SCREENPROOF_PATH")
+        if [ "$SCREENPROOF_STRICT" = "true" ]; then args+=("--strict"); fi
+        if [ -n "$SCREENPROOF_CONFIG" ]; then args+=("--config" "$SCREENPROOF_CONFIG"); fi
+        if [ -n "$SCREENPROOF_METADATA" ]; then args+=("--metadata" "$SCREENPROOF_METADATA"); fi
+        if [ "$SCREENPROOF_FLAT" = "true" ]; then args+=("--flat"); fi
+        node "$GITHUB_ACTION_PATH/src/cli.ts" "${args[@]}"
