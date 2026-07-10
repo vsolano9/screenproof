@@ -53,7 +53,8 @@ Arguments:
 Options:
   --config <file>      JSON config to override rules, locales, dimensions.
   --metadata <folder>  deliver metadata/ folder to cross-check: warns when a
-                       metadata locale has no screenshots.
+                       metadata locale has no screenshots. Locale trees only;
+                       cannot be combined with --flat.
   --flat               Treat the path as a flat folder of images (file-level
                        checks only, no locale rules).
   --strict             Exit non-zero on warnings as well as errors.
@@ -161,6 +162,11 @@ export async function run(argv: string[], io: Io): Promise<number> {
   if (args.version) {
     io.write(`${await readVersion()}\n`);
     return 0;
+  }
+
+  if (args.flat && args.metadata !== undefined) {
+    io.error(`--metadata cannot be used with --flat\n\n${HELP}`);
+    return 2;
   }
 
   let config;

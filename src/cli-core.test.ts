@@ -147,6 +147,15 @@ test("run --metadata cross-checks metadata locales", async () => {
   assert.match(io.stdout.join(""), /metadata locale de-DE has no screenshots folder/);
 });
 
+test("run rejects --flat with --metadata as incompatible", async () => {
+  const cwd = await localeTree({ "loose.png": PNG });
+  await mkdir(join(cwd, "metadata", "de-DE"), { recursive: true });
+  const io = fakeIo(cwd);
+  const code = await run(["--flat", "--metadata", "metadata"], io);
+  assert.equal(code, 2);
+  assert.match(io.stderr.join(""), /--metadata cannot be used with --flat/);
+});
+
 test("run --flat forces flat mode", async () => {
   const cwd = await localeTree({ "en-US/01.png": PNG, "loose.png": PNG });
   const io = fakeIo(cwd);

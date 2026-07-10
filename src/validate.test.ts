@@ -148,6 +148,13 @@ test("screenshot-locale-empty warns on empty locale folders and missing metadata
   assert.match(findings.find((f) => f.locale === "fr-FR")!.message, /metadata locale fr-FR has no screenshots folder/);
 });
 
+test("flat mode ignores metadata locale checks", () => {
+  const scan = scanResult([localeScan("", [png("01.png", "", 1260, 2736)])], { mode: "flat" });
+  const report = validate(scan, defaultConfig(), { metadataLocales: ["de-DE"] });
+  assert.deepEqual(byRule(report, "screenshot-locale-empty"), []);
+  assert.equal(report.ok, true);
+});
+
 test("screenshot-primary-size-missing is off by default and platform-aware when enabled", () => {
   const scan = scanResult([localeScan("en-US", [png("01.png", "en-US", 1284, 2778), png("02.png", "en-US", 1668, 2224)])]);
   assert.equal(byRule(validate(scan, defaultConfig()), "screenshot-primary-size-missing").length, 0);

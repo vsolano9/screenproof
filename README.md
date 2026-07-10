@@ -41,7 +41,7 @@ If `path` is omitted, screenproof looks for `./fastlane/screenshots`, then `./sc
 | Option | Description |
 | --- | --- |
 | `--config <file>` | JSON config to override rules, locales, and the dimension table. |
-| `--metadata <folder>` | deliver `metadata/` folder to cross-check: warns when a metadata locale has no screenshots. |
+| `--metadata <folder>` | deliver `metadata/` folder to cross-check against a locale tree: warns when a metadata locale has no screenshots. Cannot be combined with explicit `--flat`. |
 | `--flat` | Treat the path as a flat folder of images (file-level checks only). |
 | `--strict` | Exit non-zero on warnings as well as errors. |
 | `--json` | Print the report as JSON. |
@@ -133,6 +133,7 @@ screenproof ~/Desktop/new-screenshots --flat
 ```
 
 Flat mode runs the file-level checks only (dimensions, format, alpha, unexpected files); locale and count rules need a deliver tree.
+`--metadata` cannot be combined with explicit `--flat`. If screenproof auto-detects a flat folder while `--metadata` is present, it still runs the file-level checks and skips the locale comparison.
 
 ## Known limitations
 

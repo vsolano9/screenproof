@@ -158,7 +158,7 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     }
   }
 
-  if (options.metadataLocales) {
+  if (scan.mode === "locale" && options.metadataLocales) {
     const present = new Set(scan.locales.map((l) => l.locale));
     for (const name of options.metadataLocales) {
       if (!present.has(name)) {
