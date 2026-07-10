@@ -59,6 +59,8 @@ test("parseArgs supports = forms and rejects bad usage", () => {
   assert.equal(parseArgs(["--metadata=m"]).metadata, "m");
   assert.throws(() => parseArgs(["--metadata"]), /--metadata requires a folder path/);
   assert.throws(() => parseArgs(["--config"]), /--config requires a file path/);
+  assert.throws(() => parseArgs(["--metadata="]), /--metadata requires a folder path/);
+  assert.throws(() => parseArgs(["--config="]), /--config requires a file path/);
   assert.throws(() => parseArgs(["--wat"]), /unknown option/);
   assert.throws(() => parseArgs(["a", "b"]), /unexpected extra argument/);
 });

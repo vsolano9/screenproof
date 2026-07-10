@@ -39,6 +39,13 @@ test("mergeConfig overrides rule levels and rejects bad ones", () => {
   );
 });
 
+test("mergeConfig rejects unknown rule ids so typos cannot silently disable a rule", () => {
+  assert.throws(
+    () => mergeConfig(defaultConfig(), { rules: { "screenshot-png-alfa": "off" } }),
+    /config\.rules\.screenshot-png-alfa is not a known rule id/,
+  );
+});
+
 test("mergeConfig rejects a non-object config", () => {
   assert.throws(() => mergeConfig(defaultConfig(), "nope"), /config must be a JSON object/);
 });

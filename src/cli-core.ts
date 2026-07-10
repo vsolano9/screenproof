@@ -95,13 +95,17 @@ export function parseArgs(argv: string[]): ParsedArgs {
       if (value === undefined) throw new Error("--config requires a file path");
       args.config = value;
     } else if (token.startsWith("--config=")) {
-      args.config = token.slice("--config=".length);
+      const value = token.slice("--config=".length);
+      if (value === "") throw new Error("--config requires a file path");
+      args.config = value;
     } else if (token === "--metadata") {
       const value = argv[++i];
       if (value === undefined) throw new Error("--metadata requires a folder path");
       args.metadata = value;
     } else if (token.startsWith("--metadata=")) {
-      args.metadata = token.slice("--metadata=".length);
+      const value = token.slice("--metadata=".length);
+      if (value === "") throw new Error("--metadata requires a folder path");
+      args.metadata = value;
     } else if (token.startsWith("-")) {
       throw new Error(`unknown option: ${token}`);
     } else {
