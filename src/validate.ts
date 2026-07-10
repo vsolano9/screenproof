@@ -84,7 +84,12 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       emit("screenshot-unknown-locale", locale.locale, message);
     }
 
-    if (locale.files.length === 0) {
+    // Locale-level rules (empty locale, per-localization count cap, primary
+    // size, parity) only make sense over deliver locale folders; flat mode is
+    // documented as file-level checks only.
+    const localeRules = scan.mode === "locale";
+
+    if (localeRules && locale.files.length === 0) {
       emit("screenshot-locale-empty", locale.locale, "locale folder has no screenshots");
     }
 
@@ -130,24 +135,26 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       presentClassIds.add(deviceClass.id);
     }
 
-    for (const { label, count } of countByClass.values()) {
-      if (count > MAX_PER_CLASS) {
-        emit(
-          "screenshot-count-over",
-          locale.locale,
-          `${count} screenshots for ${label} (max ${MAX_PER_CLASS} per device size per localization)`,
-        );
+    if (localeRules) {
+      for (const { label, count } of countByClass.values()) {
+        if (count > MAX_PER_CLASS) {
+          emit(
+            "screenshot-count-over",
+            locale.locale,
+            `${count} screenshots for ${label} (max ${MAX_PER_CLASS} per device size per localization)`,
+          );
+        }
       }
-    }
 
-    for (const primary of PRIMARY_BY_PLATFORM) {
-      if (presentPlatforms.has(primary.platform) && !presentClassIds.has(primary.classId)) {
-        emit("screenshot-primary-size-missing", locale.locale, primary.message);
+      for (const primary of PRIMARY_BY_PLATFORM) {
+        if (presentPlatforms.has(primary.platform) && !presentClassIds.has(primary.classId)) {
+          emit("screenshot-primary-size-missing", locale.locale, primary.message);
+        }
       }
-    }
 
-    if (locale.locale !== "default") {
-      classIdsByLocale.set(locale.locale, presentClassIds);
+      if (locale.locale !== "default") {
+        classIdsByLocale.set(locale.locale, presentClassIds);
+      }
     }
   }
 

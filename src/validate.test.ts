@@ -204,3 +204,34 @@ test("report assembly: counts, ok flags, deterministic order, mode copied", () =
   assert.deepEqual(enUs.map((f) => f.rule), ["screenshot-png-alpha", "screenshot-unknown-dimensions"]);
   assert.equal(report.findings.length, 3);
 });
+
+test("flat mode runs file-level checks only: no count, primary, or locale-empty rules", () => {
+  const eleven = Array.from({ length: 11 }, (_, i) => png(`${String(i).padStart(2, "0")}.png`, "", 1284, 2778));
+  const scan = scanResult([localeScan("", eleven)], { mode: "flat" });
+  const report = validate(scan, rules({ "screenshot-primary-size-missing": "warning" }));
+  assert.deepEqual(byRule(report, "screenshot-count-over"), []);
+  assert.deepEqual(byRule(report, "screenshot-primary-size-missing"), []);
+  assert.deepEqual(byRule(report, "screenshot-locale-empty"), []);
+  assert.equal(report.ok, true);
+});
+
+test("flat mode still runs the per-file checks", () => {
+  const scan = scanResult(
+    [localeScan("", [png("a.png", "", 500, 500), badFile("b.png", "", "truncated PNG (no IHDR)")], { unexpected: ["notes.txt"] })],
+    { mode: "flat" },
+  );
+  const report = validate(scan, defaultConfig());
+  assert.equal(byRule(report, "screenshot-unknown-dimensions").length, 1);
+  assert.equal(byRule(report, "screenshot-format").length, 1);
+  assert.equal(byRule(report, "screenshot-unexpected-file").length, 1);
+});
+
+test("flat mode empty root reports missing-screenshots once, not locale-empty", () => {
+  const scan = scanResult([localeScan("", [])], {
+    mode: "flat",
+    diagnostics: [{ locale: "", rule: "missing-screenshots", severity: "error", message: "no screenshots found in /x" }],
+  });
+  const report = validate(scan, defaultConfig());
+  assert.equal(byRule(report, "missing-screenshots").length, 1);
+  assert.deepEqual(byRule(report, "screenshot-locale-empty"), []);
+});
