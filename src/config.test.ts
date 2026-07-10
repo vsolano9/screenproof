@@ -9,6 +9,7 @@ import { DEFAULT_RULES, defaultConfig, loadConfig, mergeConfig } from "./config.
 test("default rule levels match the plan", () => {
   assert.deepEqual(DEFAULT_RULES, {
     "missing-screenshots": "error",
+    "screenshot-unreadable": "error",
     "screenshot-unknown-dimensions": "error",
     "screenshot-count-over": "error",
     "screenshot-format": "error",

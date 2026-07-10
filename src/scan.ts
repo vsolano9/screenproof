@@ -11,7 +11,7 @@
  * the missing/empty-root diagnostics.
  */
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 import { parseImageHeader } from "./imageheader.ts";
@@ -33,6 +33,36 @@ function isImageFile(name: string): boolean {
   return IMAGE_EXTENSIONS.has(extname(name).toLowerCase());
 }
 
+interface DirEntry {
+  name: string;
+  isFile(): boolean;
+  isDirectory(): boolean;
+  isSymbolicLink(): boolean;
+}
+
+/**
+ * Resolve what an entry actually is, following symlinks (fastlane trees may
+ * share images or whole locale folders via links). "broken" is a symlink
+ * whose target is gone; null is anything else (sockets, fifos).
+ */
+type EntryKind = "file" | "dir" | "broken" | null;
+
+async function entryKind(dir: string, entry: DirEntry): Promise<EntryKind> {
+  if (entry.isFile()) return "file";
+  if (entry.isDirectory()) return "dir";
+  if (entry.isSymbolicLink()) {
+    try {
+      const target = await stat(join(dir, entry.name));
+      if (target.isFile()) return "file";
+      if (target.isDirectory()) return "dir";
+      return null;
+    } catch {
+      return "broken";
+    }
+  }
+  return null;
+}
+
 async function scanImage(dir: string, name: string, locale: string): Promise<ScreenshotFile> {
   const path = join(dir, name);
   let parse: ScreenshotFile["parse"];
@@ -52,7 +82,7 @@ interface FolderScan {
 async function scanFiles(
   dir: string,
   locale: string,
-  entries: { name: string; isFile(): boolean; isDirectory(): boolean }[],
+  entries: DirEntry[],
   options: { foldersAsUnexpected: boolean },
 ): Promise<FolderScan> {
   const files: ScreenshotFile[] = [];
@@ -60,11 +90,16 @@ async function scanFiles(
   const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of sorted) {
     if (isHidden(entry.name)) continue;
-    if (entry.isDirectory()) {
+    const kind = await entryKind(dir, entry);
+    if (kind === "dir") {
       if (options.foldersAsUnexpected) unexpectedFiles.push(`${entry.name}/`);
       continue;
     }
-    if (!entry.isFile()) continue;
+    if (kind === "broken") {
+      unexpectedFiles.push(entry.name);
+      continue;
+    }
+    if (kind !== "file") continue;
     if (isImageFile(entry.name)) {
       files.push(await scanImage(dir, entry.name, locale));
     } else {
@@ -93,15 +128,21 @@ export async function scan(root: string, config: Config, options: ScanOptions = 
   }
 
   const visible = entries.filter((entry) => !isHidden(entry.name));
+  const kinds = new Map<string, EntryKind>();
+  for (const entry of visible) {
+    kinds.set(entry.name, await entryKind(root, entry));
+  }
   const dirs = visible
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => kinds.get(entry.name) === "dir")
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Locale mode when any folder is a recognized locale, or when the root is
   // folders-only (no loose images): a deliver tree with misspelled locale
   // folders must still scan as a tree so the unknown-locale rule can fire,
   // instead of being mistaken for an empty flat folder.
-  const rootImages = visible.some((entry) => entry.isFile() && isImageFile(entry.name));
+  const rootImages = visible.some(
+    (entry) => kinds.get(entry.name) === "file" && isImageFile(entry.name),
+  );
   const localeMode =
     !options.forceFlat &&
     (dirs.some((dir) => dir.name === "default" || isKnownLocale(dir.name, config)) ||
@@ -121,10 +162,22 @@ export async function scan(root: string, config: Config, options: ScanOptions = 
   }
 
   const locales: LocaleScan[] = [];
+  const diagnostics: Finding[] = [];
   for (const dir of dirs) {
     if (config.locales.ignore.includes(dir.name)) continue;
     const dirPath = join(root, dir.name);
-    const children = await readdir(dirPath, { withFileTypes: true });
+    let children;
+    try {
+      children = await readdir(dirPath, { withFileTypes: true });
+    } catch (err) {
+      diagnostics.push({
+        locale: dir.name,
+        rule: "screenshot-unreadable",
+        severity: "error",
+        message: `locale folder could not be read: ${(err as Error).message}`,
+      });
+      continue;
+    }
     const { files, unexpectedFiles } = await scanFiles(dirPath, dir.name, children, {
       foldersAsUnexpected: true,
     });
@@ -138,7 +191,10 @@ export async function scan(root: string, config: Config, options: ScanOptions = 
 
   // Loose visible files directly in the root belong inside locale folders;
   // they land in a synthetic "" entry that validate flags.
-  const rootLoose = visible.filter((entry) => entry.isFile());
+  const rootLoose = visible.filter((entry) => {
+    const kind = kinds.get(entry.name);
+    return kind === "file" || kind === "broken";
+  });
   if (rootLoose.length > 0) {
     const { files, unexpectedFiles } = await scanFiles(root, "", rootLoose, {
       foldersAsUnexpected: false,
@@ -148,8 +204,9 @@ export async function scan(root: string, config: Config, options: ScanOptions = 
     }
   }
 
-  const diagnostics: Finding[] =
-    locales.length === 0 ? [missingFinding(`no screenshots found in ${root}`)] : [];
+  if (locales.length === 0 && diagnostics.length === 0) {
+    diagnostics.push(missingFinding(`no screenshots found in ${root}`));
+  }
   return { root, mode: "locale", locales, diagnostics };
 }
 

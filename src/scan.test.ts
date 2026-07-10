@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -177,4 +177,56 @@ test("root images beside non-locale folders keep flat mode", async () => {
   const result = await scan(root, defaultConfig());
   assert.equal(result.mode, "flat");
   assert.equal(result.locales[0]!.files.length, 1);
+});
+
+test("an unreadable locale folder becomes a screenshot-unreadable diagnostic, not a crash", async (t) => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    t.skip("running as root, chmod 000 is not enforced");
+    return;
+  }
+  const root = await tree();
+  await mkdir(join(root, "en-US"));
+  await writeFile(join(root, "en-US", "01.png"), PNG);
+  await mkdir(join(root, "de-DE"));
+  await chmod(join(root, "de-DE"), 0o000);
+  try {
+    const result = await scan(root, defaultConfig());
+    const diag = result.diagnostics.find((d) => d.rule === "screenshot-unreadable");
+    assert.ok(diag, "expected a screenshot-unreadable diagnostic");
+    assert.equal(diag.locale, "de-DE");
+    assert.match(diag.message, /could not be read/);
+    assert.ok(result.locales.some((l) => l.locale === "en-US" && l.files.length === 1));
+  } finally {
+    await chmod(join(root, "de-DE"), 0o755);
+  }
+});
+
+test("symlinked images and locale folders are followed", async () => {
+  const root = await tree();
+  const assets = await tree();
+  await writeFile(join(assets, "real.png"), PNG);
+  await mkdir(join(assets, "shared-locale"));
+  await writeFile(join(assets, "shared-locale", "01.png"), PNG);
+  await mkdir(join(root, "en-US"));
+  await symlink(join(assets, "real.png"), join(root, "en-US", "linked.png"));
+  await symlink(join(assets, "shared-locale"), join(root, "de-DE"));
+  const result = await scan(root, defaultConfig());
+  const en = result.locales.find((l) => l.locale === "en-US");
+  assert.ok(en);
+  assert.equal(en.files.length, 1);
+  assert.equal(en.files[0]!.name, "linked.png");
+  assert.equal(en.files[0]!.parse.ok, true);
+  const de = result.locales.find((l) => l.locale === "de-DE");
+  assert.ok(de, "symlinked locale folder should scan as a locale");
+  assert.equal(de.files.length, 1);
+});
+
+test("broken symlinks are recorded as unexpected files", async () => {
+  const root = await tree();
+  await mkdir(join(root, "en-US"));
+  await writeFile(join(root, "en-US", "01.png"), PNG);
+  await symlink(join(root, "gone.png"), join(root, "en-US", "dead.png"));
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.locales[0]!.files.length, 1);
+  assert.deepEqual(result.locales[0]!.unexpectedFiles, ["dead.png"]);
 });

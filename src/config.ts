@@ -18,6 +18,7 @@ const RULE_LEVELS: ReadonlySet<string> = new Set(["error", "warning", "info", "o
 /** Default rule severities. Keys are stable rule ids used across the linter. */
 export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
   "missing-screenshots": "error",
+  "screenshot-unreadable": "error",
   "screenshot-unknown-dimensions": "error",
   "screenshot-count-over": "error",
   "screenshot-format": "error",
