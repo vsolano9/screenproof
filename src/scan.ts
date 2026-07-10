@@ -97,9 +97,15 @@ export async function scan(root: string, config: Config, options: ScanOptions = 
     .filter((entry) => entry.isDirectory())
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Locale mode when any folder is a recognized locale, or when the root is
+  // folders-only (no loose images): a deliver tree with misspelled locale
+  // folders must still scan as a tree so the unknown-locale rule can fire,
+  // instead of being mistaken for an empty flat folder.
+  const rootImages = visible.some((entry) => entry.isFile() && isImageFile(entry.name));
   const localeMode =
     !options.forceFlat &&
-    dirs.some((dir) => dir.name === "default" || isKnownLocale(dir.name, config));
+    (dirs.some((dir) => dir.name === "default" || isKnownLocale(dir.name, config)) ||
+      (dirs.length > 0 && !rootImages));
 
   if (!localeMode) {
     const { files, unexpectedFiles } = await scanFiles(root, "", visible, {

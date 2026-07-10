@@ -157,3 +157,24 @@ test("listMetadataLocales returns real locales only", async () => {
 test("listMetadataLocales throws on a missing folder", async () => {
   await assert.rejects(listMetadataLocales("/nonexistent/metadata"), /metadata folder not found/);
 });
+
+test("a tree of only unknown locale folders scans in locale mode, not flat", async () => {
+  const root = await tree();
+  await mkdir(join(root, "en_US"));
+  await writeFile(join(root, "en_US", "01.png"), PNG);
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.mode, "locale");
+  assert.equal(result.locales.length, 1);
+  assert.equal(result.locales[0]!.locale, "en_US");
+  assert.equal(result.locales[0]!.isKnownLocale, false);
+  assert.equal(result.locales[0]!.files.length, 1);
+});
+
+test("root images beside non-locale folders keep flat mode", async () => {
+  const root = await tree();
+  await mkdir(join(root, "originals"));
+  await writeFile(join(root, "01.png"), PNG);
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.mode, "flat");
+  assert.equal(result.locales[0]!.files.length, 1);
+});
