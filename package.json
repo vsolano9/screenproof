@@ -1,6 +1,6 @@
 {
   "name": "screenproof",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lint your iOS App Store screenshots (a fastlane deliver screenshots folder or any image folder) against Apple's published size, format, and count rules before you submit. Offline, zero dependencies.",
   "type": "module",
   "bin": {

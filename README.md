@@ -36,7 +36,7 @@ npm install --save-dev screenproof
 screenproof [path] [options]
 ```
 
-If `path` is omitted, screenproof looks for `./fastlane/screenshots`, then `./screenshots`. Point it at a deliver tree (per-locale folders) or any flat folder of images; the mode is detected automatically.
+If `path` is omitted, screenproof looks for `./fastlane/screenshots`, then `./screenshots`. Point it at a deliver tree (per-locale folders) or any flat folder of images; the mode is detected automatically. A root that contains subfolders and no loose images is treated as a locale tree (so misspelled locale folders still get flagged); loose images at the root mean flat mode. Symlinked images and locale folders are followed, and broken symlinks are flagged as unexpected files.
 
 | Option | Description |
 | --- | --- |
@@ -57,6 +57,7 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | Rule | Default | Fires when |
 | --- | --- | --- |
 | `missing-screenshots` | error | The screenshots folder is missing or contains no screenshots. |
+| `screenshot-unreadable` | error | A locale folder exists but cannot be read (permissions, or deleted mid-scan). |
 | `screenshot-unknown-dimensions` | error | An image's pixel size matches no known App Store size (the classic late-upload failure). The finding names the closest valid size. |
 | `screenshot-count-over` | error | More than 10 screenshots resolve to one device size in one locale (orientations combined). |
 | `screenshot-format` | error | A `.png`/`.jpg`/`.jpeg` file whose header does not parse (corrupt, truncated, or mislabeled, like HEIC bytes behind a `.png` name). |
@@ -97,7 +98,7 @@ Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` 
 
 ## Config
 
-Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Every key is optional and merges over defaults. See [examples/](examples/) for a commented example.
+Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Every key is optional and merges over defaults. Unknown rule ids are rejected with an error, so a typo cannot silently disable a rule. See [examples/](examples/) for a commented example.
 
 ```json
 {
