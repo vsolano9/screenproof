@@ -95,3 +95,24 @@ test("exit codes: 0 clean, 1 errors, 1 warnings under strict only", () => {
   assert.equal(exitCode(report([WARNING]), true), 1);
   assert.equal(exitCode(report([INFO]), true), 0);
 });
+
+test("report-level warnings render the warning marker and file name, not the error glyph", () => {
+  const r = report([]);
+  const stray: Finding = {
+    locale: "",
+    file: "stray.txt",
+    rule: "screenshot-unexpected-file",
+    severity: "warning",
+    message: "screenshots must live inside a locale folder",
+  };
+  r.findings = [stray];
+  r.warningCount = 1;
+  r.locales = [];
+  const text = renderHuman(r);
+  const line = text.split("\n").find((l) => l.includes("must live inside"));
+  assert.ok(line, "expected the report-level warning line");
+  assert.equal(line.includes("✖"), false);
+  assert.match(line, /warning/);
+  assert.match(line, /stray\.txt/);
+  assert.match(text, /PASS/);
+});

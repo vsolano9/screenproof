@@ -74,12 +74,18 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   }
 
   // Report-level findings: locale "" in locale mode (missing root, stray
-  // root files). In flat mode "" is a real locale section above.
+  // root files). In flat mode "" is a real locale section above. The glyph
+  // tracks severity; ✖ is reserved for errors.
   const reportLevel =
     report.mode === "locale" ? report.findings.filter((f) => f.locale === "") : [];
   for (const finding of reportLevel) {
     const sev = paint(finding.severity.padEnd(7), COLORS[finding.severity], color);
-    lines.push(`${paint("✖", COLORS.error, color)} ${sev} ${finding.message}`);
+    const glyph =
+      finding.severity === "error"
+        ? paint("✖", COLORS.error, color)
+        : paint("!", COLORS[finding.severity], color);
+    const fileLabel = finding.file ?? "-";
+    lines.push(`${glyph} ${sev} ${fileLabel.padEnd(24)} ${finding.message}`);
   }
 
   lines.push("");
