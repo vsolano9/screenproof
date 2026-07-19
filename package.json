@@ -1,7 +1,7 @@
 {
   "name": "screenproof",
-  "version": "0.1.2",
-  "description": "Lint your iOS App Store screenshots (a fastlane deliver screenshots folder or any image folder) against Apple's published size, format, and count rules before you submit. Offline, zero dependencies.",
+  "version": "0.2.0",
+  "description": "Lint App Store screenshots and app previews against Apple's published dimensions, format, duration, file-size, and count rules. Offline, zero dependencies.",
   "type": "module",
   "bin": {
     "screenproof": "dist/cli.js"
@@ -33,6 +33,8 @@
     "fastlane",
     "deliver",
     "screenshots",
+    "app-previews",
+    "video",
     "aso",
     "linter",
     "ci",

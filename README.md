@@ -1,8 +1,8 @@
 # screenproof
 
-Lint your App Store screenshots before you submit.
+Lint your App Store screenshots and app previews before you submit.
 
-`screenproof` checks a [fastlane `deliver`](https://docs.fastlane.tools/actions/deliver/) `screenshots/` tree (or any folder of images) against Apple's published screenshot rules: exact pixel sizes per device, PNG/JPEG format validity, alpha channels, per-device counts, and locale-folder hygiene. It runs offline, catches problems before an upload fails late with a vague error, and returns a non-zero exit code so it can gate CI.
+`screenproof` checks a [fastlane `deliver`](https://docs.fastlane.tools/actions/deliver/) `screenshots/` tree (or any folder of media) against Apple's published screenshot and app-preview rules: exact dimensions, format validity, duration, file size, per-localization counts, and locale-folder hygiene. It runs offline, catches problems before an upload fails late with a vague error, and returns a non-zero exit code so it can gate CI.
 
 It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metaproof), which lints the text metadata half of the same submission.
 
@@ -10,7 +10,9 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 - Device-class detection by pixel resolution, mirroring deliver's behavior including the iPad 12.9"/13" and Apple TV/Vision Pro shared-resolution disambiguation.
 - Per-locale checks: counts over Apple's 10-per-device limit, empty locale folders, typo locale names (`en_US`), stray files.
 - Optional cross-checks: locale parity across localizations, current-primary-size presence, and a `--metadata` comparison against your deliver metadata tree.
+- App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-localization limit.
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
+- Zero-dependency ISO base-media and QuickTime atom parsing that skips encoded media payloads.
 
 ## Requirements
 
@@ -64,9 +66,14 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `screenshot-png-alpha` | warning | A PNG declares an alpha channel. App Store Connect may reject transparency. |
 | `screenshot-unexpected-file` | warning | A visible non-image file sits in a locale folder, or files sit directly in the screenshots root. |
 | `screenshot-unknown-locale` | warning | A folder name is not a known App Store locale (catches `en_US`-style typos; also flags `default/`, which deliver does not support for screenshots). |
-| `screenshot-locale-empty` | warning | A locale folder has no screenshots; with `--metadata`, also a metadata locale with no screenshots folder. |
+| `screenshot-locale-empty` | warning | A locale folder has no screenshots or app previews; with `--metadata`, also a metadata locale with no screenshots folder. |
 | `screenshot-primary-size-missing` | off | A locale has iPhone or iPad screenshots but none at the platform's current primary size. Off by default because Apple auto-scales from the largest size. |
 | `screenshot-locale-parity` | off | A locale is missing a device class that other locales have. |
+| `preview-format` | error | A video uses an unsupported extension or its ISO base-media/QuickTime atoms cannot be parsed. |
+| `preview-file-size` | error | An app preview exceeds Apple's 500 MB limit. |
+| `preview-duration` | error | An app preview is shorter than 15 seconds or longer than 30 seconds. |
+| `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
+| `preview-count-over` | error | A localization contains more than three app previews. |
 
 Enable the opt-in rules via config: `{ "rules": { "screenshot-locale-parity": "warning" } }`.
 
@@ -95,6 +102,22 @@ Verified against Apple's screenshot specifications page and fastlane deliver's s
 | `watch-*` | Apple Watch (Ultra 3 to Series 3) | 422x514, 410x502, 416x496, 396x484, 368x448, 312x390 | none |
 
 Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` is the 13-inch iPad (add `IPAD_PRO_129`-style keywords for 2nd gen), and keywordless `3840x2160` is Apple TV (name the file `vision-...` for Vision Pro).
+
+## Accepted app-preview sizes
+
+Verified against Apple's [app-preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications) on **2026-07-19**.
+
+| Platform family | Accepted portrait | Accepted landscape |
+| --- | --- | --- |
+| Modern iPhone | 886x1920 | 1920x886 |
+| 5.5-inch and 4-inch iPhone | 1080x1920 | 1920x1080 |
+| 4.7-inch iPhone | 750x1334 | 1334x750 |
+| Current iPad | 1200x1600 | 1600x1200 |
+| Legacy iPad | 900x1200 | 1200x900 |
+| Mac and Apple TV | none | 1920x1080 |
+| Apple Vision Pro | none | 3840x2160 |
+
+The repository snapshot is `fixtures/preview-dimensions-snapshot.json`.
 
 ## Config
 
@@ -132,7 +155,7 @@ Point screenproof at any folder of images (no fastlane required):
 screenproof ~/Desktop/new-screenshots --flat
 ```
 
-Flat mode runs the file-level checks only (dimensions, format, alpha, unexpected files); locale and count rules need a deliver tree.
+Flat mode runs the file-level checks only (dimensions, format, alpha, preview size and duration, unexpected files); locale and count rules need a deliver tree.
 `--metadata` cannot be combined with explicit `--flat`. If screenproof auto-detects a flat folder while `--metadata` is present, it still runs the file-level checks and skips the locale comparison.
 
 ## Known limitations
@@ -141,7 +164,8 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, unexpected
 - PNG transparency via a `tRNS` chunk (palette transparency without an alpha color type) is not detected; only alpha color types 4 and 6 are flagged.
 - Rare JPEG variants outside baseline, extended, and progressive surface as parse findings rather than being silently accepted.
 - The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
-- App preview (video) checks are not implemented yet; see the roadmap.
+- App-preview codec profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet. The current parser validates the container, movie duration, and video track display dimensions without decoding media.
+- A malformed app preview with a `moov` atom larger than 64 MB is rejected to keep validation memory-bounded.
 
 ## Validation
 
@@ -153,7 +177,8 @@ npm run build  # compile dist/
 
 ## Roadmap
 
-- [ ] App preview (video) checks: duration, count, resolution, format, via zero-dependency MP4/MOV atom parsing, once Apple's preview specification page is verified.
+- [x] App preview checks: duration, count, resolution, format, and file size via zero-dependency MP4/MOV atom parsing.
+- [ ] Fixture-backed app-preview codec, audio, bitrate, and frame-rate checks.
 - [ ] `tRNS`-chunk PNG transparency detection.
 
 ## License

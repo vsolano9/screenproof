@@ -28,6 +28,11 @@ export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
   "screenshot-locale-empty": "warning",
   "screenshot-primary-size-missing": "off",
   "screenshot-locale-parity": "off",
+  "preview-format": "error",
+  "preview-file-size": "error",
+  "preview-duration": "error",
+  "preview-resolution": "error",
+  "preview-count-over": "error",
 };
 
 /** A fresh default configuration. */

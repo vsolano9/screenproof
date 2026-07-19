@@ -47,6 +47,28 @@ export interface ImageInfo {
 
 export type ParseResult = { ok: true; info: ImageInfo } | { ok: false; reason: string };
 
+export interface PreviewInfo {
+  durationSeconds: number;
+  width: number;
+  height: number;
+}
+
+export type PreviewParseResult =
+  | { ok: true; info: PreviewInfo }
+  | { ok: false; reason: string };
+
+export interface PreviewFile {
+  /** Absolute path. */
+  path: string;
+  /** Basename, e.g. `01-walkthrough.mp4`. */
+  name: string;
+  /** Locale folder name, or `""` in flat mode / for root-level files. */
+  locale: string;
+  sizeBytes: number;
+  extensionSupported: boolean;
+  parse: PreviewParseResult;
+}
+
 /** One image file found in the screenshots tree. */
 export interface ScreenshotFile {
   /** Absolute path. */
@@ -63,6 +85,8 @@ export interface LocaleScan {
   /** True when the folder name is a known App Store locale (config-aware). */
   isKnownLocale: boolean;
   files: ScreenshotFile[];
+  /** App-preview video files found beside screenshots. */
+  previews?: PreviewFile[];
   /** Visible non-image files (and `name/` subfolders) found in the folder. */
   unexpectedFiles: string[];
 }

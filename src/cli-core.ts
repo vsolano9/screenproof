@@ -40,14 +40,14 @@ export interface ParsedArgs {
   version: boolean;
 }
 
-export const HELP = `screenproof - lint iOS App Store screenshots before you submit
+export const HELP = `screenproof - lint App Store screenshots and app previews before you submit
 
 Usage:
   screenproof [path] [options]
 
 Arguments:
   path                 Path to a fastlane deliver screenshots/ folder, or any
-                       folder of images. Defaults to ./fastlane/screenshots
+                       folder of screenshot and preview media. Defaults to ./fastlane/screenshots
                        or ./screenshots.
 
 Options:
@@ -55,7 +55,7 @@ Options:
   --metadata <folder>  deliver metadata/ folder to cross-check: warns when a
                        metadata locale has no screenshots. Locale trees only;
                        cannot be combined with --flat.
-  --flat               Treat the path as a flat folder of images (file-level
+  --flat               Treat the path as a flat folder of media (file-level
                        checks only, no locale rules).
   --strict             Exit non-zero on warnings as well as errors.
   --json               Print the report as JSON.

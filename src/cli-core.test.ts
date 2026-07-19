@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import { parseArgs, run, type Io } from "./cli-core.ts";
 import { makePng } from "./test-support/images.ts";
+import { makePreview } from "./test-support/previews.ts";
 
 const PNG = makePng(1260, 2736);
 const ALPHA_PNG = makePng(1260, 2736, { alpha: true });
@@ -71,6 +72,24 @@ test("run lints a clean locale tree and exits 0", async () => {
   const code = await run([join(cwd, "screenshots")], io);
   assert.equal(code, 0);
   assert.match(io.stdout.join(""), /PASS/);
+});
+
+test("run validates app previews end to end", async () => {
+  const cwd = await localeTree({
+    "en-US/01.png": PNG,
+    "en-US/walkthrough.mp4": makePreview(20, 886, 1920),
+  });
+  const io = fakeIo(cwd);
+  assert.equal(await run([join(cwd, "screenshots")], io), 0);
+  assert.match(io.stdout.join(""), /PASS/);
+
+  const bad = await localeTree({
+    "en-US/walkthrough.mp4": makePreview(10, 887, 1920),
+  });
+  const badIo = fakeIo(bad);
+  assert.equal(await run([join(bad, "screenshots")], badIo), 1);
+  assert.match(badIo.stdout.join(""), /outside Apple's 15 to 30 second range/);
+  assert.match(badIo.stdout.join(""), /does not match any accepted App Store app-preview resolution/);
 });
 
 test("run discovers ./screenshots from cwd", async () => {

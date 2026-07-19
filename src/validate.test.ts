@@ -2,7 +2,14 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import { defaultConfig } from "./config.ts";
-import type { Config, Finding, LocaleScan, ScanResult, ScreenshotFile } from "./types.ts";
+import type {
+  Config,
+  Finding,
+  LocaleScan,
+  PreviewFile,
+  ScanResult,
+  ScreenshotFile,
+} from "./types.ts";
 import { validate } from "./validate.ts";
 
 function png(name: string, locale: string, width: number, height: number, alpha = false): ScreenshotFile {
@@ -18,8 +25,38 @@ function badFile(name: string, locale: string, reason: string): ScreenshotFile {
   return { path: `/x/${locale}/${name}`, name, locale, parse: { ok: false, reason } };
 }
 
-function localeScan(locale: string, files: ScreenshotFile[], opts: { known?: boolean; unexpected?: string[] } = {}): LocaleScan {
-  return { locale, isKnownLocale: opts.known ?? true, files, unexpectedFiles: opts.unexpected ?? [] };
+function preview(
+  name: string,
+  locale: string,
+  durationSeconds: number,
+  width: number,
+  height: number,
+  opts: { sizeBytes?: number; supported?: boolean; reason?: string } = {},
+): PreviewFile {
+  return {
+    path: `/x/${locale}/${name}`,
+    name,
+    locale,
+    sizeBytes: opts.sizeBytes ?? 1_000_000,
+    extensionSupported: opts.supported ?? true,
+    parse: opts.reason
+      ? { ok: false, reason: opts.reason }
+      : { ok: true, info: { durationSeconds, width, height } },
+  };
+}
+
+function localeScan(
+  locale: string,
+  files: ScreenshotFile[],
+  opts: { known?: boolean; unexpected?: string[]; previews?: PreviewFile[] } = {},
+): LocaleScan {
+  return {
+    locale,
+    isKnownLocale: opts.known ?? true,
+    files,
+    previews: opts.previews ?? [],
+    unexpectedFiles: opts.unexpected ?? [],
+  };
 }
 
 function scanResult(locales: LocaleScan[], opts: { mode?: "locale" | "flat"; diagnostics?: Finding[] } = {}): ScanResult {
@@ -241,4 +278,65 @@ test("flat mode empty root reports missing-screenshots once, not locale-empty", 
   const report = validate(scan, defaultConfig());
   assert.equal(byRule(report, "missing-screenshots").length, 1);
   assert.deepEqual(byRule(report, "screenshot-locale-empty"), []);
+});
+
+test("valid app previews pass the file-level rules", () => {
+  const scan = scanResult([
+    localeScan("en-US", [], {
+      previews: [preview("walkthrough.mp4", "en-US", 20, 886, 1920)],
+    }),
+  ]);
+  const report = validate(scan, defaultConfig());
+  assert.equal(report.errorCount, 0);
+  assert.deepEqual(report.findings, []);
+});
+
+test("app-preview format, size, duration, and resolution rules are independent", () => {
+  const scan = scanResult([
+    localeScan("en-US", [], {
+      previews: [
+        preview("bad.webm", "en-US", 20, 886, 1920, {
+          supported: false,
+          reason: "unsupported app-preview extension .webm",
+        }),
+        preview("large.mp4", "en-US", 20, 886, 1920, { sizeBytes: 500_000_001 }),
+        preview("short.mp4", "en-US", 14.9, 886, 1920),
+        preview("wrong-size.mp4", "en-US", 20, 887, 1920),
+      ],
+    }),
+  ]);
+  const report = validate(scan, defaultConfig());
+  assert.equal(byRule(report, "preview-format").length, 1);
+  assert.equal(byRule(report, "preview-file-size").length, 1);
+  assert.equal(byRule(report, "preview-duration").length, 1);
+  assert.equal(byRule(report, "preview-resolution").length, 1);
+});
+
+test("app-preview count is capped at three per localization", () => {
+  const previews = Array.from({ length: 4 }, (_, index) =>
+    preview(`${index}.mp4`, "en-US", 20, 886, 1920),
+  );
+  const report = validate(
+    scanResult([localeScan("en-US", [], { previews })]),
+    defaultConfig(),
+  );
+  const findings = byRule(report, "preview-count-over");
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /4 app previews .*\(max 3\)/);
+});
+
+test("app-preview duration bounds are inclusive and flat mode skips only the count rule", () => {
+  const previews = [
+    preview("minimum.mp4", "", 15, 886, 1920),
+    preview("maximum.mp4", "", 30, 1920, 886),
+    preview("third.mp4", "", 20, 1920, 1080),
+    preview("fourth.mp4", "", 20, 3840, 2160),
+  ];
+  const report = validate(
+    scanResult([localeScan("", [], { previews })], { mode: "flat" }),
+    defaultConfig(),
+  );
+  assert.deepEqual(byRule(report, "preview-duration"), []);
+  assert.deepEqual(byRule(report, "preview-count-over"), []);
+  assert.equal(report.ok, true);
 });

@@ -8,6 +8,7 @@
 
 import { DEFAULT_RULES } from "./config.ts";
 import { applyDimensionOverrides, classify, DEFAULT_CLASSES, nearestValidSize } from "./dimensions.ts";
+import { isAcceptedPreviewSize } from "./previewdimensions.ts";
 import type {
   Config,
   Finding,
@@ -25,6 +26,10 @@ export interface ValidateOptions {
 
 /** Apple's limit: screenshots per device size per localization. */
 const MAX_PER_CLASS = 10;
+const MAX_PREVIEWS_PER_LOCALE = 3;
+const MAX_PREVIEW_BYTES = 500_000_000;
+const MIN_PREVIEW_SECONDS = 15;
+const MAX_PREVIEW_SECONDS = 30;
 
 const PRIMARY_BY_PLATFORM: ReadonlyArray<{ platform: string; classId: string; message: string }> = [
   {
@@ -73,6 +78,9 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       for (const file of locale.files) {
         emit("screenshot-unexpected-file", "", "screenshots must live inside a locale folder", file.name);
       }
+      for (const file of locale.previews ?? []) {
+        emit("screenshot-unexpected-file", "", "app previews must live inside a locale folder", file.name);
+      }
       continue;
     }
 
@@ -89,8 +97,9 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     // documented as file-level checks only.
     const localeRules = scan.mode === "locale";
 
-    if (localeRules && locale.files.length === 0) {
-      emit("screenshot-locale-empty", locale.locale, "locale folder has no screenshots");
+    const previews = locale.previews ?? [];
+    if (localeRules && locale.files.length === 0 && previews.length === 0) {
+      emit("screenshot-locale-empty", locale.locale, "locale folder has no screenshots or app previews");
     }
 
     const countByClass = new Map<string, { label: string; count: number }>();
@@ -135,7 +144,47 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       presentClassIds.add(deviceClass.id);
     }
 
+    for (const file of previews) {
+      if (file.sizeBytes > MAX_PREVIEW_BYTES) {
+        emit(
+          "preview-file-size",
+          locale.locale,
+          `${file.sizeBytes} bytes exceeds Apple's 500 MB app-preview limit`,
+          file.name,
+        );
+      }
+      if (!file.extensionSupported || !file.parse.ok) {
+        const reason = file.parse.ok ? "unsupported app-preview extension" : file.parse.reason;
+        emit("preview-format", locale.locale, `cannot parse app preview: ${reason}`, file.name);
+        continue;
+      }
+      const { durationSeconds, width, height } = file.parse.info;
+      if (durationSeconds < MIN_PREVIEW_SECONDS || durationSeconds > MAX_PREVIEW_SECONDS) {
+        emit(
+          "preview-duration",
+          locale.locale,
+          `${durationSeconds.toFixed(3).replace(/\.?0+$/, "")} seconds is outside Apple's 15 to 30 second range`,
+          file.name,
+        );
+      }
+      if (!isAcceptedPreviewSize(width, height)) {
+        emit(
+          "preview-resolution",
+          locale.locale,
+          `${width}x${height} does not match any accepted App Store app-preview resolution`,
+          file.name,
+        );
+      }
+    }
+
     if (localeRules) {
+      if (previews.length > MAX_PREVIEWS_PER_LOCALE) {
+        emit(
+          "preview-count-over",
+          locale.locale,
+          `${previews.length} app previews in this localization (max ${MAX_PREVIEWS_PER_LOCALE})`,
+        );
+      }
       for (const { label, count } of countByClass.values()) {
         if (count > MAX_PER_CLASS) {
           emit(

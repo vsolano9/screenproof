@@ -1,5 +1,5 @@
 name: screenproof
-description: Lint iOS App Store screenshots (a fastlane deliver screenshots folder or any image folder) against Apple's size, format, and count rules.
+description: Lint App Store screenshots and app previews against Apple's dimensions, format, duration, file-size, and count rules.
 author: TheChosenVictor LLC
 branding:
   icon: image
@@ -7,7 +7,7 @@ branding:
 
 inputs:
   path:
-    description: Path to the screenshots folder to lint.
+    description: Path to the screenshots and app-previews folder to lint.
     required: false
     default: fastlane/screenshots
   strict:

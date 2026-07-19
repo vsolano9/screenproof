@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { defaultConfig } from "./config.ts";
 import { listMetadataLocales, scan } from "./scan.ts";
 import { makePng } from "./test-support/images.ts";
+import { makePreview } from "./test-support/previews.ts";
 
 async function tree(): Promise<string> {
   return mkdtemp(join(tmpdir(), "screenproof-scan-"));
@@ -27,7 +28,7 @@ test("empty root reports no screenshots found", async () => {
   const root = await tree();
   const result = await scan(root, defaultConfig());
   assert.equal(result.diagnostics.length, 1);
-  assert.match(result.diagnostics[0]!.message, /no screenshots found/);
+  assert.match(result.diagnostics[0]!.message, /no screenshots or app previews found/);
 });
 
 test("a folder of images with no locale dirs scans in flat mode", async () => {
@@ -132,6 +133,34 @@ test("corrupt image files carry a failed parse, not a crash", async () => {
   const result = await scan(root, defaultConfig());
   const file = result.locales[0]!.files[0]!;
   assert.equal(file.parse.ok, false);
+});
+
+test("app-preview files are discovered separately from screenshots", async () => {
+  const root = await tree();
+  await mkdir(join(root, "en-US"));
+  await writeFile(join(root, "en-US", "01.png"), PNG);
+  await writeFile(join(root, "en-US", "walkthrough.mp4"), makePreview());
+  await writeFile(join(root, "en-US", "unsupported.webm"), new Uint8Array([1, 2, 3]));
+  const result = await scan(root, defaultConfig());
+  const locale = result.locales[0]!;
+  assert.equal(locale.files.length, 1);
+  assert.deepEqual(locale.previews?.map((file) => file.name), [
+    "unsupported.webm",
+    "walkthrough.mp4",
+  ]);
+  assert.equal(locale.previews?.[0]?.extensionSupported, false);
+  assert.equal(locale.previews?.[1]?.extensionSupported, true);
+  assert.equal(locale.previews?.[1]?.parse.ok, true);
+  assert.deepEqual(locale.unexpectedFiles, []);
+});
+
+test("a flat folder containing only app previews is not reported as empty", async () => {
+  const root = await tree();
+  await writeFile(join(root, "walkthrough.mp4"), new Uint8Array([1, 2, 3]));
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.mode, "flat");
+  assert.equal(result.locales[0]!.previews?.length, 1);
+  assert.deepEqual(result.diagnostics, []);
 });
 
 test("locales and files are sorted deterministically", async () => {
