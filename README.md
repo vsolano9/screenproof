@@ -138,14 +138,15 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0
+- uses: vsolano9/screenproof@v0.2.0
   with:
     path: fastlane/screenshots
     strict: "true"
     metadata: fastlane/metadata
 ```
 
-(Pin an exact `@v0.x.y` tag for reproducible CI.)
+The exact tag keeps CI reproducible and includes app-preview validation. The
+moving `@v0` tag currently remains on 0.1.2.
 
 ## Flat mode
 
