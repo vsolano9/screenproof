@@ -100,7 +100,7 @@ test("screenshot-png-alpha warns on alpha PNGs", () => {
   assert.equal(findings.length, 1);
   assert.equal(findings[0]!.severity, "warning");
   assert.equal(findings[0]!.file, "01.png");
-  assert.match(findings[0]!.message, /alpha channel/);
+  assert.match(findings[0]!.message, /declares transparency/);
 });
 
 test("screenshot-unknown-dimensions errors with a nearest-size suggestion", () => {

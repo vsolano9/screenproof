@@ -10,6 +10,7 @@ import { makePreview } from "./test-support/previews.ts";
 
 const PNG = makePng(1260, 2736);
 const ALPHA_PNG = makePng(1260, 2736, { alpha: true });
+const TRNS_PNG = makePng(1260, 2736, { colorType: 3, transparency: true });
 const BAD_PNG = makePng(500, 500);
 
 function fakeIo(cwd: string): Io & { stdout: string[]; stderr: string[] } {
@@ -122,6 +123,13 @@ test("run --strict fails on warnings", async () => {
   const io = fakeIo(cwd);
   assert.equal(await run([], io), 0);
   assert.equal(await run(["--strict"], io), 1);
+});
+
+test("run detects tRNS transparency end to end", async () => {
+  const cwd = await localeTree({ "en-US/01.png": TRNS_PNG });
+  const io = fakeIo(cwd);
+  assert.equal(await run(["--strict"], io), 1);
+  assert.match(io.stdout.join(""), /PNG declares transparency/);
 });
 
 test("run reports a missing root as an error exit", async () => {

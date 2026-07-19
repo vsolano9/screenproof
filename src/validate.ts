@@ -117,7 +117,7 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         emit(
           "screenshot-png-alpha",
           locale.locale,
-          "PNG has an alpha channel; App Store Connect may reject transparency",
+          "PNG declares transparency; App Store Connect may reject it",
           file.name,
         );
       }

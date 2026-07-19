@@ -63,7 +63,7 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `screenshot-unknown-dimensions` | error | An image's pixel size matches no known App Store size (the classic late-upload failure). The finding names the closest valid size. |
 | `screenshot-count-over` | error | More than 10 screenshots resolve to one device size in one locale (orientations combined). |
 | `screenshot-format` | error | A `.png`/`.jpg`/`.jpeg` file whose header does not parse (corrupt, truncated, or mislabeled, like HEIC bytes behind a `.png` name). |
-| `screenshot-png-alpha` | warning | A PNG declares an alpha channel. App Store Connect may reject transparency. |
+| `screenshot-png-alpha` | warning | A PNG declares transparency through an alpha colour type or `tRNS` chunk. App Store Connect may reject transparency. |
 | `screenshot-unexpected-file` | warning | A visible non-image file sits in a locale folder, or files sit directly in the screenshots root. |
 | `screenshot-unknown-locale` | warning | A folder name is not a known App Store locale (catches `en_US`-style typos; also flags `default/`, which deliver does not support for screenshots). |
 | `screenshot-locale-empty` | warning | A locale folder has no screenshots or app previews; with `--metadata`, also a metadata locale with no screenshots folder. |
@@ -138,15 +138,15 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.2.0
+- uses: vsolano9/screenproof@v0.2.1
   with:
     path: fastlane/screenshots
     strict: "true"
     metadata: fastlane/metadata
 ```
 
-The exact tag keeps CI reproducible and includes app-preview validation. The
-moving `@v0` tag currently remains on 0.1.2.
+The exact tag keeps CI reproducible and includes app-preview and `tRNS`
+transparency validation. The moving `@v0` tag currently remains on 0.1.2.
 
 ## Flat mode
 
@@ -162,7 +162,6 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 ## Known limitations
 
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
-- PNG transparency via a `tRNS` chunk (palette transparency without an alpha color type) is not detected; only alpha color types 4 and 6 are flagged.
 - Rare JPEG variants outside baseline, extended, and progressive surface as parse findings rather than being silently accepted.
 - The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
 - App-preview codec profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet. The current parser validates the container, movie duration, and video track display dimensions without decoding media.
@@ -180,7 +179,7 @@ npm run build  # compile dist/
 
 - [x] App preview checks: duration, count, resolution, format, and file size via zero-dependency MP4/MOV atom parsing.
 - [ ] Fixture-backed app-preview codec, audio, bitrate, and frame-rate checks.
-- [ ] `tRNS`-chunk PNG transparency detection.
+- [x] `tRNS`-chunk PNG transparency detection.
 
 ## License
 

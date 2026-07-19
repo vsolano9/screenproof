@@ -41,7 +41,7 @@ export interface ImageInfo {
   format: "png" | "jpeg";
   width: number;
   height: number;
-  /** True for PNG colour types 4 and 6 (alpha channel present). Always false for JPEG. */
+  /** True when a PNG declares transparency via colour type 4/6 or tRNS. Always false for JPEG. */
   hasAlpha: boolean;
 }
 

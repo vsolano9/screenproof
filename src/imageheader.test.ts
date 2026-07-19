@@ -35,6 +35,26 @@ test("parses a grayscale-alpha PNG (colour type 4) as having alpha", () => {
   assert.equal(info.hasAlpha, true);
 });
 
+test("parses palette PNG transparency from a tRNS chunk", () => {
+  const info = expectOk(makePng(100, 50, { colorType: 3, transparency: true }));
+  assert.equal(info.hasAlpha, true);
+});
+
+test("keeps a palette PNG without tRNS opaque", () => {
+  const info = expectOk(makePng(100, 50, { colorType: 3 }));
+  assert.equal(info.hasAlpha, false);
+});
+
+test("keeps an all-opaque palette tRNS table opaque", () => {
+  const info = expectOk(
+    makePng(100, 50, {
+      colorType: 3,
+      transparency: new Uint8Array([0xff]),
+    }),
+  );
+  assert.equal(info.hasAlpha, false);
+});
+
 test("rejects a truncated PNG", () => {
   const reason = expectFail(makePng(10, 10).slice(0, 20));
   assert.match(reason, /truncated PNG/);

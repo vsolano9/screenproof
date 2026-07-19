@@ -1,10 +1,11 @@
 /**
  * Zero-dependency PNG and JPEG header parsing.
  *
- * screenproof only needs pixel dimensions and (for PNG) whether an alpha
- * channel is declared, so it reads image headers directly instead of pulling
- * in an image library. Every read is bounds-checked: corrupt or truncated
- * files produce a `ParseResult` failure, never a crash.
+ * screenproof only needs pixel dimensions and (for PNG) whether transparency
+ * is declared through an alpha colour type or tRNS chunk, so it reads image
+ * headers directly instead of pulling in an image library. Every read is
+ * bounds-checked: corrupt or truncated files produce a `ParseResult` failure,
+ * never a crash.
  */
 
 import type { ParseResult } from "./types.ts";
@@ -33,13 +34,21 @@ function isJpeg(buf: Uint8Array): boolean {
   return buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8;
 }
 
+function chunkTypeEquals(buf: Uint8Array, offset: number, type: string): boolean {
+  return (
+    buf[offset] === type.charCodeAt(0) &&
+    buf[offset + 1] === type.charCodeAt(1) &&
+    buf[offset + 2] === type.charCodeAt(2) &&
+    buf[offset + 3] === type.charCodeAt(3)
+  );
+}
+
 /** Legal PNG colour types (spec: 0 gray, 2 RGB, 3 palette, 4 gray+alpha, 6 RGBA). */
 const PNG_COLOR_TYPES: ReadonlySet<number> = new Set([0, 2, 3, 4, 6]);
 
 function parsePng(buf: Uint8Array): ParseResult {
-  // Signature (8) + IHDR length (4) + "IHDR" (4) + 13 data bytes = 29 bytes.
-  // Require the complete IHDR data, not just the fields we read.
-  if (buf.length < 29) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
+  // Signature (8) + length (4) + "IHDR" (4) + data (13) + CRC (4) = 33.
+  if (buf.length < 33) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
   if (readU32BE(buf, 8) !== 13) {
     return { ok: false, reason: "invalid PNG: IHDR length is not 13" };
   }
@@ -63,7 +72,36 @@ function parsePng(buf: Uint8Array): ParseResult {
     return { ok: false, reason: `corrupt PNG: invalid color type ${colorType}` };
   }
 
-  const hasAlpha = colorType === 4 || colorType === 6;
+  let hasAlpha = colorType === 4 || colorType === 6;
+  let offset = 33;
+  while (!hasAlpha) {
+    if (offset + 8 > buf.length) {
+      return { ok: false, reason: "truncated PNG (incomplete chunk header before IDAT)" };
+    }
+    const length = readU32BE(buf, offset);
+    if (length > 0x7fffffff) {
+      return { ok: false, reason: "corrupt PNG: chunk length exceeds PNG limit" };
+    }
+    const chunkEnd = offset + 12 + length;
+    if (chunkEnd > buf.length) {
+      return { ok: false, reason: "truncated PNG (chunk exceeds file bounds)" };
+    }
+    if (chunkTypeEquals(buf, offset + 4, "tRNS")) {
+      if (colorType === 3) {
+        const dataStart = offset + 8;
+        hasAlpha = buf.subarray(dataStart, dataStart + length).some((alpha) => alpha < 0xff);
+      } else {
+        // Grayscale and truecolor tRNS chunks identify one transparent sample.
+        hasAlpha = true;
+      }
+      break;
+    }
+    if (chunkTypeEquals(buf, offset + 4, "IDAT") || chunkTypeEquals(buf, offset + 4, "IEND")) {
+      break;
+    }
+    offset = chunkEnd;
+  }
+
   return { ok: true, info: { format: "png", width, height, hasAlpha } };
 }
 

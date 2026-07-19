@@ -35,7 +35,7 @@ const WARNING: Finding = {
   file: "02.png",
   rule: "screenshot-png-alpha",
   severity: "warning",
-  message: "PNG has an alpha channel; App Store Connect may reject transparency",
+  message: "PNG declares transparency; App Store Connect may reject it",
 };
 
 const INFO: Finding = { locale: "en-US", rule: "screenshot-note", severity: "info", message: "note" };
