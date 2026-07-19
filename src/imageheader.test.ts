@@ -40,6 +40,16 @@ test("parses palette PNG transparency from a tRNS chunk", () => {
   assert.equal(info.hasAlpha, true);
 });
 
+test("parses grayscale PNG transparency from a tRNS chunk", () => {
+  const info = expectOk(makePng(100, 50, { colorType: 0, transparency: true }));
+  assert.equal(info.hasAlpha, true);
+});
+
+test("parses truecolor PNG transparency from a tRNS chunk", () => {
+  const info = expectOk(makePng(100, 50, { colorType: 2, transparency: true }));
+  assert.equal(info.hasAlpha, true);
+});
+
 test("keeps a palette PNG without tRNS opaque", () => {
   const info = expectOk(makePng(100, 50, { colorType: 3 }));
   assert.equal(info.hasAlpha, false);

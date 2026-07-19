@@ -55,22 +55,23 @@ function pngChunk(type: string, data: Uint8Array): Uint8Array {
 export const PNG_SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /**
- * Build a real PNG. Colour types: 2 = RGB (no alpha), 3 = palette, 4 =
+ * Build a real PNG. Colour types: 0 = grayscale, 2 = RGB, 3 = palette, 4 =
  * grayscale+alpha, 6 = RGBA. `alpha: true` is shorthand for colour type 6;
- * `transparency: true` adds a fully transparent tRNS entry, while bytes can
- * be supplied directly for edge cases.
+ * `transparency: true` adds a valid transparent sample/table entry, while
+ * bytes can be supplied directly for edge cases.
  */
 export function makePng(
   width: number,
   height: number,
   opts: {
     alpha?: boolean;
-    colorType?: 2 | 3 | 4 | 6;
+    colorType?: 0 | 2 | 3 | 4 | 6;
     transparency?: boolean | Uint8Array;
   } = {},
 ): Uint8Array {
   const colorType = opts.colorType ?? (opts.alpha ? 6 : 2);
-  const bytesPerPixel = colorType === 2 ? 3 : colorType === 3 ? 1 : colorType === 4 ? 2 : 4;
+  const bytesPerPixel =
+    colorType === 0 || colorType === 3 ? 1 : colorType === 2 ? 3 : colorType === 4 ? 2 : 4;
 
   const ihdr = concat([
     u32be(width),
@@ -82,20 +83,20 @@ export function makePng(
   const raw = new Uint8Array((1 + width * bytesPerPixel) * height);
   const idat = new Uint8Array(deflateSync(raw));
 
-  const transparencyChunks =
-    colorType === 3
-      ? [
-          pngChunk("PLTE", new Uint8Array([0x00, 0x00, 0x00])),
-          ...(opts.transparency
-            ? [
-                pngChunk(
-                  "tRNS",
-                  opts.transparency === true ? new Uint8Array([0x00]) : opts.transparency,
-                ),
-              ]
-            : []),
-        ]
-      : [];
+  const transparencyData =
+    opts.transparency === true
+      ? colorType === 0
+        ? new Uint8Array(2)
+        : colorType === 2
+          ? new Uint8Array(6)
+          : new Uint8Array([0x00])
+      : opts.transparency;
+  const transparencyChunks = [
+    ...(colorType === 3 ? [pngChunk("PLTE", new Uint8Array([0x00, 0x00, 0x00]))] : []),
+    ...(transparencyData && (colorType === 0 || colorType === 2 || colorType === 3)
+      ? [pngChunk("tRNS", transparencyData)]
+      : []),
+  ];
 
   return concat([
     PNG_SIGNATURE,
