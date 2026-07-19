@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, open, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -108,4 +108,67 @@ test("file parsing skips media payload atoms and reads moov metadata", async () 
     ok: true,
     info: { durationSeconds: 25, width: 1920, height: 1080 },
   });
+});
+
+test("file parsing rejects malformed top-level atom headers without reading payloads", async () => {
+  const root = await mkdtemp(join(tmpdir(), "screenproof-preview-malformed-"));
+  const cases = [
+    {
+      name: "truncated.mp4",
+      bytes: new Uint8Array(7),
+      reason: "truncated top-level atom header",
+    },
+    {
+      name: "truncated-extended.mp4",
+      bytes: concat([u32(1), text("moov"), new Uint8Array(7)]),
+      reason: "moov atom has a truncated extended size",
+    },
+    {
+      name: "undersized.mp4",
+      bytes: concat([u32(4), text("moov")]),
+      reason: "moov atom has an invalid size",
+    },
+    {
+      name: "out-of-bounds.mp4",
+      bytes: concat([u32(100), text("mdat")]),
+      reason: "mdat atom exceeds file bounds",
+    },
+  ];
+
+  for (const entry of cases) {
+    const path = join(root, entry.name);
+    await writeFile(path, entry.bytes);
+    assert.deepEqual(await parsePreviewFile(path), { ok: false, reason: entry.reason });
+  }
+});
+
+test("file parsing rejects a sparse oversized moov atom before loading it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "screenproof-preview-large-"));
+  const path = join(root, "oversized.mp4");
+  const atomSize = (64 * 1024 * 1024) + 1;
+  const handle = await open(path, "w");
+  try {
+    await handle.write(concat([u32(atomSize), text("moov")]), 0, 8, 0);
+    await handle.truncate(atomSize);
+  } finally {
+    await handle.close();
+  }
+
+  assert.deepEqual(await parsePreviewFile(path), {
+    ok: false,
+    reason: "moov atom is unreasonably large",
+  });
+});
+
+test("header parsing handles deterministic malformed byte sequences without throwing", () => {
+  let state = 0x51f15e;
+  for (let length = 0; length <= 256; length += 1) {
+    const bytes = new Uint8Array(length);
+    for (let index = 0; index < bytes.length; index += 1) {
+      state = ((state * 1_664_525) + 1_013_904_223) >>> 0;
+      bytes[index] = state & 0xff;
+    }
+    const parsed = parsePreviewHeader(bytes);
+    assert.equal(typeof parsed.ok, "boolean");
+  }
 });
