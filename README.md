@@ -2,7 +2,7 @@
 
 Lint your App Store screenshots and app previews before you submit.
 
-`screenproof` checks a [fastlane `deliver`](https://docs.fastlane.tools/actions/deliver/) `screenshots/` tree (or any folder of media) against Apple's published screenshot and app-preview rules: exact dimensions, format validity, duration, file size, per-localization counts, and locale-folder hygiene. It runs offline, catches problems before an upload fails late with a vague error, and returns a non-zero exit code so it can gate CI.
+`screenproof` checks a [fastlane `deliver`](https://docs.fastlane.tools/actions/deliver/) `screenshots/` tree (or any folder of media) against Apple's published screenshot and app-preview rules: exact dimensions, format validity, video codec/container compatibility, duration, file size, per-localization counts, and locale-folder hygiene. It runs offline, catches problems before an upload fails late with a vague error, and returns a non-zero exit code so it can gate CI.
 
 It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metaproof), which lints the text metadata half of the same submission.
 
@@ -10,7 +10,7 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 - Device-class detection by pixel resolution, mirroring deliver's behavior including the iPad 12.9"/13" and Apple TV/Vision Pro shared-resolution disambiguation.
 - Per-locale checks: counts over Apple's 10-per-device limit, empty locale folders, typo locale names (`en_US`), stray files.
 - Optional cross-checks: locale parity across localizations, current-primary-size presence, and a `--metadata` comparison against your deliver metadata tree.
-- App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-localization limit.
+- App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, H.264 or ProRes 422 HQ codec/container compatibility, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-localization limit.
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
 - Zero-dependency ISO base-media and QuickTime atom parsing that skips encoded media payloads.
 
@@ -70,6 +70,7 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `screenshot-primary-size-missing` | off | A locale has iPhone or iPad screenshots but none at the platform's current primary size. Off by default because Apple auto-scales from the largest size. |
 | `screenshot-locale-parity` | off | A locale is missing a device class that other locales have. |
 | `preview-format` | error | A video uses an unsupported extension or its ISO base-media/QuickTime atoms cannot be parsed. |
+| `preview-codec` | error | A video has no codec sample entry, uses a codec other than H.264 (`avc1`/`avc3`) or ProRes 422 HQ (`apch`), or places ProRes 422 HQ in a non-`.mov` container. |
 | `preview-file-size` | error | An app preview exceeds Apple's 500 MB limit. |
 | `preview-duration` | error | An app preview is shorter than 15 seconds or longer than 30 seconds. |
 | `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
@@ -164,7 +165,7 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
 - Rare JPEG variants outside baseline, extended, and progressive surface as parse findings rather than being silently accepted.
 - The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
-- App-preview codec profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet. The current parser validates the container, movie duration, and video track display dimensions without decoding media.
+- App-preview H.264 profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet. The current parser validates the container, video sample-entry codec, movie duration, and video track display dimensions without decoding media.
 - A malformed app preview with a `moov` atom larger than 64 MB is rejected to keep validation memory-bounded.
 
 ## Validation
@@ -177,8 +178,8 @@ npm run build  # compile dist/
 
 ## Roadmap
 
-- [x] App preview checks: duration, count, resolution, format, and file size via zero-dependency MP4/MOV atom parsing.
-- [ ] Fixture-backed app-preview codec, audio, bitrate, and frame-rate checks.
+- [x] App preview checks: duration, count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
+- [ ] Fixture-backed app-preview H.264 profile, audio, bitrate, frame-rate, and rotation checks.
 - [x] `tRNS`-chunk PNG transparency detection.
 
 ## License

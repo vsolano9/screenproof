@@ -93,6 +93,22 @@ test("run validates app previews end to end", async () => {
   assert.match(badIo.stdout.join(""), /does not match any accepted App Store app-preview resolution/);
 });
 
+test("run reports unsupported and container-incompatible preview codecs", async () => {
+  const unsupported = await localeTree({
+    "en-US/walkthrough.mp4": makePreview(20, 886, 1920, 0, "hvc1"),
+  });
+  const unsupportedIo = fakeIo(unsupported);
+  assert.equal(await run([join(unsupported, "screenshots")], unsupportedIo), 1);
+  assert.match(unsupportedIo.stdout.join(""), /hvc1.*not accepted/);
+
+  const incompatible = await localeTree({
+    "en-US/walkthrough.mp4": makePreview(20, 886, 1920, 0, "apch"),
+  });
+  const incompatibleIo = fakeIo(incompatible);
+  assert.equal(await run([join(incompatible, "screenshots")], incompatibleIo), 1);
+  assert.match(incompatibleIo.stdout.join(""), /apch.*requires a \.mov container/);
+});
+
 test("run discovers ./screenshots from cwd", async () => {
   const cwd = await localeTree({ "en-US/01.png": PNG });
   const io = fakeIo(cwd);

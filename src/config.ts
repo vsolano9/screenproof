@@ -29,6 +29,7 @@ export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
   "screenshot-primary-size-missing": "off",
   "screenshot-locale-parity": "off",
   "preview-format": "error",
+  "preview-codec": "error",
   "preview-file-size": "error",
   "preview-duration": "error",
   "preview-resolution": "error",

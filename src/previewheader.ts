@@ -1,9 +1,10 @@
 /**
  * Minimal ISO base-media and QuickTime atom parser for App Store previews.
  *
- * It reads only structural metadata needed by screenproof: movie duration and
- * the first video track's display dimensions. Codec, audio, bitrate, and frame
- * rate checks remain outside this parser until they have fixture-backed rules.
+ * It reads only structural metadata needed by screenproof: movie duration,
+ * the first video track's display dimensions, and its sample-entry FourCC.
+ * Audio, bitrate, frame-rate, profile, and rotation checks remain outside this
+ * parser until they have fixture-backed rules.
  */
 
 import { open } from "node:fs/promises";
@@ -116,6 +117,30 @@ function trackDimensions(bytes: Uint8Array, trak: Atom): { width: number; height
   return { width, height };
 }
 
+function videoCodecFourCC(bytes: Uint8Array, trak: Atom): string | null {
+  try {
+    const mdia = child(trak, bytes, "mdia");
+    if (!mdia) return null;
+    const minf = child(mdia, bytes, "minf");
+    if (!minf) return null;
+    const stbl = child(minf, bytes, "stbl");
+    if (!stbl) return null;
+    const stsd = child(stbl, bytes, "stsd");
+    if (!stsd) return null;
+    if (stsd.end - stsd.dataStart < 8) throw new Error("stsd full box is truncated");
+    const version = bytes[stsd.dataStart];
+    if (version !== 0) throw new Error(`unsupported stsd version ${version}`);
+    const declaredEntryCount = u32(bytes, stsd.dataStart + 4);
+    const entries = atoms(bytes, stsd.dataStart + 8, stsd.end);
+    if (entries.length !== declaredEntryCount) {
+      throw new Error(`stsd declares ${declaredEntryCount} entries but contains ${entries.length}`);
+    }
+    return entries[0]?.type ?? null;
+  } catch (error) {
+    throw new Error(`video sample description is malformed: ${(error as Error).message}`);
+  }
+}
+
 /** Parse a complete `moov`-containing byte range. */
 export function parsePreviewHeader(bytes: Uint8Array): PreviewParseResult {
   try {
@@ -129,7 +154,8 @@ export function parsePreviewHeader(bytes: Uint8Array): PreviewParseResult {
       .find((entry) => isVideoTrack(bytes, entry));
     if (!videoTrack) return { ok: false, reason: "moov atom has no video track" };
     const { width, height } = trackDimensions(bytes, videoTrack);
-    return { ok: true, info: { durationSeconds, width, height } };
+    const codecFourCC = videoCodecFourCC(bytes, videoTrack);
+    return { ok: true, info: { durationSeconds, width, height, codecFourCC } };
   } catch (error) {
     return { ok: false, reason: (error as Error).message };
   }

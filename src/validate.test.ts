@@ -31,7 +31,7 @@ function preview(
   durationSeconds: number,
   width: number,
   height: number,
-  opts: { sizeBytes?: number; supported?: boolean; reason?: string } = {},
+  opts: { sizeBytes?: number; supported?: boolean; reason?: string; codecFourCC?: string | null } = {},
 ): PreviewFile {
   return {
     path: `/x/${locale}/${name}`,
@@ -41,7 +41,15 @@ function preview(
     extensionSupported: opts.supported ?? true,
     parse: opts.reason
       ? { ok: false, reason: opts.reason }
-      : { ok: true, info: { durationSeconds, width, height } },
+      : {
+          ok: true,
+          info: {
+            durationSeconds,
+            width,
+            height,
+            codecFourCC: opts.codecFourCC === undefined ? "avc1" : opts.codecFourCC,
+          },
+        },
   };
 }
 
@@ -289,6 +297,61 @@ test("valid app previews pass the file-level rules", () => {
   const report = validate(scan, defaultConfig());
   assert.equal(report.errorCount, 0);
   assert.deepEqual(report.findings, []);
+});
+
+test("app-preview codec accepts H.264 containers and MOV-only ProRes 422 HQ", () => {
+  const scan = scanResult([
+    localeScan("", [], {
+      previews: [
+        preview("one.mov", "", 20, 886, 1920, { codecFourCC: "avc1" }),
+        preview("two.m4v", "", 20, 886, 1920, { codecFourCC: "avc3" }),
+        preview("three.mp4", "", 20, 886, 1920, { codecFourCC: "avc1" }),
+        preview("four.mov", "", 20, 886, 1920, { codecFourCC: "apch" }),
+      ],
+    }),
+  ], { mode: "flat" });
+  const report = validate(scan, defaultConfig());
+  assert.equal(report.ok, true);
+  assert.deepEqual(byRule(report, "preview-codec"), []);
+});
+
+test("app-preview codec rejects missing, unsupported, and incompatible sample entries", () => {
+  const scan = scanResult([
+    localeScan("en-US", [], {
+      previews: [
+        preview("missing.mp4", "en-US", 20, 886, 1920, { codecFourCC: null }),
+        preview("hevc.mp4", "en-US", 20, 886, 1920, { codecFourCC: "hvc1" }),
+        preview("prores.mp4", "en-US", 20, 886, 1920, { codecFourCC: "apch" }),
+      ],
+    }),
+  ]);
+  const findings = byRule(validate(scan, defaultConfig()), "preview-codec");
+  assert.equal(findings.length, 3);
+  assert.match(findings.find((finding) => finding.file === "missing.mp4")!.message, /no video codec sample entry/);
+  assert.match(findings.find((finding) => finding.file === "hevc.mp4")!.message, /hvc1.*not accepted/);
+  assert.match(findings.find((finding) => finding.file === "prores.mp4")!.message, /apch.*requires a \.mov container/);
+});
+
+test("app-preview codec rule can be disabled independently", () => {
+  const scan = scanResult([
+    localeScan("en-US", [], {
+      previews: [preview("hevc.mp4", "en-US", 20, 886, 1920, { codecFourCC: "hvc1" })],
+    }),
+  ]);
+  assert.equal(byRule(validate(scan, rules({ "preview-codec": "off" })), "preview-codec").length, 0);
+});
+
+test("malformed sample descriptions remain preview-format failures", () => {
+  const scan = scanResult([
+    localeScan("en-US", [], {
+      previews: [preview("malformed.mp4", "en-US", 20, 886, 1920, {
+        reason: "video sample description is malformed: stsd full box is truncated",
+      })],
+    }),
+  ]);
+  const report = validate(scan, defaultConfig());
+  assert.equal(byRule(report, "preview-format").length, 1);
+  assert.deepEqual(byRule(report, "preview-codec"), []);
 });
 
 test("app-preview format, size, duration, and resolution rules are independent", () => {

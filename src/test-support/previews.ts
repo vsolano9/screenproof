@@ -31,6 +31,7 @@ export function makePreview(
   width = 886,
   height = 1920,
   mediaPayloadBytes = 0,
+  codecFourCC: string | null = "avc1",
 ): Uint8Array {
   const mvhd = new Uint8Array(20);
   mvhd.set(u32(1_000), 12);
@@ -43,12 +44,24 @@ export function makePreview(
   const hdlr = new Uint8Array(12);
   hdlr.set(text("vide"), 8);
 
+  const stsd = concat([
+    new Uint8Array(4),
+    u32(codecFourCC === null ? 0 : 1),
+    ...(codecFourCC === null ? [] : [box(codecFourCC, new Uint8Array(0))]),
+  ]);
+
   return concat([
     box("ftyp", concat([text("isom"), u32(0), text("isom")])),
     box("mdat", new Uint8Array(mediaPayloadBytes)),
     box("moov", concat([
       box("mvhd", mvhd),
-      box("trak", concat([box("tkhd", tkhd), box("mdia", box("hdlr", hdlr))])),
+      box("trak", concat([
+        box("tkhd", tkhd),
+        box("mdia", concat([
+          box("hdlr", hdlr),
+          box("minf", box("stbl", box("stsd", stsd))),
+        ])),
+      ])),
     ])),
   ]);
 }

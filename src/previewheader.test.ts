@@ -34,7 +34,12 @@ function box(type: string, payload: Uint8Array): Uint8Array {
   return concat([u32(payload.length + 8), text(type), payload]);
 }
 
-function preview(durationSeconds = 20, width = 886, height = 1920): Uint8Array {
+function preview(
+  durationSeconds = 20,
+  width = 886,
+  height = 1920,
+  codecFourCC: string | null = "avc1",
+): Uint8Array {
   const mvhd = new Uint8Array(20);
   mvhd.set(u32(1_000), 12);
   mvhd.set(u32(durationSeconds * 1_000), 16);
@@ -46,11 +51,23 @@ function preview(durationSeconds = 20, width = 886, height = 1920): Uint8Array {
   const hdlr = new Uint8Array(12);
   hdlr.set(text("vide"), 8);
 
+  const stsd = concat([
+    new Uint8Array(4),
+    u32(codecFourCC === null ? 0 : 1),
+    ...(codecFourCC === null ? [] : [box(codecFourCC, new Uint8Array(0))]),
+  ]);
+
   return concat([
     box("ftyp", concat([text("isom"), u32(0), text("isom")])),
     box("moov", concat([
       box("mvhd", mvhd),
-      box("trak", concat([box("tkhd", tkhd), box("mdia", box("hdlr", hdlr))])),
+      box("trak", concat([
+        box("tkhd", tkhd),
+        box("mdia", concat([
+          box("hdlr", hdlr),
+          box("minf", box("stbl", box("stsd", stsd))),
+        ])),
+      ])),
     ])),
   ]);
 }
@@ -58,8 +75,49 @@ function preview(durationSeconds = 20, width = 886, height = 1920): Uint8Array {
 test("parses duration and video dimensions from ISO base-media atoms", () => {
   assert.deepEqual(parsePreviewHeader(preview()), {
     ok: true,
-    info: { durationSeconds: 20, width: 886, height: 1920 },
+    info: { durationSeconds: 20, width: 886, height: 1920, codecFourCC: "avc1" },
   });
+});
+
+test("extracts supported H.264 and ProRes sample-entry FourCC values", () => {
+  for (const codecFourCC of ["avc1", "avc3", "apch"]) {
+    const parsed = parsePreviewHeader(preview(20, 886, 1920, codecFourCC));
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) assert.equal(parsed.info.codecFourCC, codecFourCC);
+  }
+});
+
+test("reports an empty video sample-description table as a null codec", () => {
+  const parsed = parsePreviewHeader(preview(20, 886, 1920, null));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) assert.equal(parsed.info.codecFourCC, null);
+});
+
+test("rejects malformed video sample descriptions as format parse failures", () => {
+  const valid = preview();
+  const marker = text("stsd");
+  const markerOffset = valid.findIndex((_, index) =>
+    index + marker.length <= valid.length && marker.every((byte, part) => valid[index + part] === byte)
+  );
+  assert.notEqual(markerOffset, -1);
+
+  const malformed = [
+    (() => {
+      const truncated = valid.slice();
+      truncated.set(u32(12), markerOffset - 4);
+      return truncated;
+    })(),
+    (() => {
+      const wrongEntryCount = valid.slice();
+      wrongEntryCount.set(u32(2), markerOffset + 8);
+      return wrongEntryCount;
+    })(),
+  ];
+  for (const bytes of malformed) {
+    const parsed = parsePreviewHeader(bytes);
+    assert.equal(parsed.ok, false);
+    if (!parsed.ok) assert.match(parsed.reason, /sample description|stsd/);
+  }
 });
 
 test("supports version 1 movie headers with 64-bit duration", () => {
@@ -106,7 +164,7 @@ test("file parsing skips media payload atoms and reads moov metadata", async () 
   await writeFile(path, makePreview(25, 1920, 1080, 1_000_000));
   assert.deepEqual(await parsePreviewFile(path), {
     ok: true,
-    info: { durationSeconds: 25, width: 1920, height: 1080 },
+    info: { durationSeconds: 25, width: 1920, height: 1080, codecFourCC: "avc1" },
   });
 });
 

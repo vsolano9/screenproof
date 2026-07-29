@@ -51,6 +51,8 @@ export interface PreviewInfo {
   durationSeconds: number;
   width: number;
   height: number;
+  /** Video sample-entry FourCC from `stsd`, or null when no entry is declared. */
+  codecFourCC: string | null;
 }
 
 export type PreviewParseResult =

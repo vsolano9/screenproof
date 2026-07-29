@@ -6,6 +6,8 @@
  * root) pass through here so config levels apply uniformly.
  */
 
+import { extname } from "node:path";
+
 import { DEFAULT_RULES } from "./config.ts";
 import { applyDimensionOverrides, classify, DEFAULT_CLASSES, nearestValidSize } from "./dimensions.ts";
 import { isAcceptedPreviewSize } from "./previewdimensions.ts";
@@ -30,6 +32,20 @@ const MAX_PREVIEWS_PER_LOCALE = 3;
 const MAX_PREVIEW_BYTES = 500_000_000;
 const MIN_PREVIEW_SECONDS = 15;
 const MAX_PREVIEW_SECONDS = 30;
+
+function previewCodecProblem(name: string, codecFourCC: string | null): string | null {
+  if (codecFourCC === null) {
+    return "app preview has no video codec sample entry";
+  }
+  const extension = extname(name).toLowerCase();
+  if (codecFourCC === "avc1" || codecFourCC === "avc3") return null;
+  if (codecFourCC === "apch") {
+    return extension === ".mov"
+      ? null
+      : "ProRes 422 HQ sample entry apch requires a .mov container";
+  }
+  return `video codec sample entry ${codecFourCC} is not accepted; use H.264 (avc1 or avc3) or ProRes 422 HQ (apch)`;
+}
 
 const PRIMARY_BY_PLATFORM: ReadonlyArray<{ platform: string; classId: string; message: string }> = [
   {
@@ -158,7 +174,11 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         emit("preview-format", locale.locale, `cannot parse app preview: ${reason}`, file.name);
         continue;
       }
-      const { durationSeconds, width, height } = file.parse.info;
+      const { durationSeconds, width, height, codecFourCC } = file.parse.info;
+      const codecProblem = previewCodecProblem(file.name, codecFourCC);
+      if (codecProblem !== null) {
+        emit("preview-codec", locale.locale, codecProblem, file.name);
+      }
       if (durationSeconds < MIN_PREVIEW_SECONDS || durationSeconds > MAX_PREVIEW_SECONDS) {
         emit(
           "preview-duration",

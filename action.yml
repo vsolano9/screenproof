@@ -1,5 +1,5 @@
 name: screenproof
-description: Lint App Store screenshots and app previews against Apple's dimensions, format, duration, file-size, and count rules.
+description: Lint App Store screenshots and app previews against Apple's dimensions, format, codec, duration, file-size, and count rules.
 author: TheChosenVictor LLC
 branding:
   icon: image
