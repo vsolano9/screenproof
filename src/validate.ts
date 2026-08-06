@@ -16,6 +16,7 @@ import type {
   Finding,
   LintReport,
   LocaleReport,
+  PreviewAudioTrack,
   RuleLevel,
   ScanResult,
   Severity,
@@ -39,6 +40,115 @@ const MAX_PREVIEWS_PER_CLASS = 3;
 const MAX_PREVIEW_BYTES = 500_000_000;
 const MIN_PREVIEW_SECONDS = 15;
 const MAX_PREVIEW_SECONDS = 30;
+
+/** Apple: "Max frame rate: 30 frames per second", for H.264 and ProRes alike. */
+const MAX_PREVIEW_FPS = 30;
+
+/**
+ * H.264 must be High Profile Level 4.0. `AVCProfileIndication` 100 is High;
+ * `AVCLevelIndication` is in tenths, so 40 is level 4.0.
+ */
+const H264_MAX_PROFILE = 100;
+const H264_MAX_LEVEL = 40;
+
+const H264_PROFILE_NAMES: Readonly<Record<number, string>> = {
+  66: "Baseline",
+  77: "Main",
+  88: "Extended",
+  100: "High",
+  110: "High 10",
+  122: "High 4:2:2",
+  244: "High 4:4:4 Predictive",
+};
+
+/** Uncompressed audio sample entries, which Apple allows only alongside ProRes. */
+const PCM_FOURCCS: ReadonlySet<string> = new Set([
+  "lpcm", "sowt", "twos", "raw ", "in24", "in32", "fl32", "fl64",
+]);
+
+/** Apple: "44.1kHz or 48kHz". */
+const AUDIO_SAMPLE_RATES: ReadonlySet<number> = new Set([44_100, 48_000]);
+
+/** Apple, for PCM only: "16-, 24-, or 32-bit". */
+const PCM_BIT_DEPTHS: ReadonlySet<number> = new Set([16, 24, 32]);
+
+function profileName(indication: number): string {
+  return H264_PROFILE_NAMES[indication] ?? `profile ${indication}`;
+}
+
+/** Render a level indication in tenths as Apple writes it, e.g. 41 -> "4.1". */
+function levelName(indication: number): string {
+  return `${Math.floor(indication / 10)}.${indication % 10}`;
+}
+
+/** Trim a computed frame rate to something readable: 29.97, 30, 59.94. */
+function formatRate(rate: number): string {
+  return Number(rate.toFixed(2)).toString();
+}
+
+/**
+ * Apple's audio requirements, checked against every audio track.
+ *
+ * Stereo can arrive two ways — one track carrying two channels, or two tracks
+ * carrying one each — so the layout rule looks at the set, while codec, sample
+ * rate, and bit depth are per track. PCM is accepted only alongside ProRes 422
+ * HQ; an H.264 preview must use AAC.
+ */
+function audioProblems(
+  tracks: readonly PreviewAudioTrack[],
+  videoCodecFourCC: string | null,
+): Array<{ rule: string; message: string }> {
+  if (tracks.length === 0) {
+    return [{
+      rule: "preview-audio-missing",
+      message: "app preview has no audio track; Apple requires stereo audio",
+    }];
+  }
+
+  const problems: Array<{ rule: string; message: string }> = [];
+  const channels = tracks.map((track) => track.channelCount);
+  const isStereo =
+    (tracks.length === 1 && channels[0] === 2) ||
+    (tracks.length === 2 && channels.every((count) => count === 1));
+  if (!isStereo) {
+    problems.push({
+      rule: "preview-audio-layout",
+      message: `audio is ${tracks.length} track(s) with ${channels.join(" + ")} channel(s); Apple requires stereo as one 2-channel track or two 1-channel tracks`,
+    });
+  }
+
+  const prores = videoCodecFourCC === "apch";
+  const seenCodecProblem = new Set<string>();
+  for (const track of tracks) {
+    const isPcm = PCM_FOURCCS.has(track.codecFourCC);
+    const isAac = track.codecFourCC === "mp4a";
+    if (!isAac && !(isPcm && prores) && !seenCodecProblem.has(track.codecFourCC)) {
+      seenCodecProblem.add(track.codecFourCC);
+      problems.push({
+        rule: "preview-audio-codec",
+        message: isPcm
+          ? `audio sample entry ${track.codecFourCC} is PCM, which Apple accepts only with ProRes 422 HQ; an H.264 preview needs 256 kbps AAC`
+          : `audio sample entry ${track.codecFourCC} is not accepted; use 256 kbps AAC${prores ? " or PCM" : ""}`,
+      });
+    }
+
+    if (track.sampleRateHz > 0 && !AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
+      problems.push({
+        rule: "preview-audio-sample-rate",
+        message: `audio sample rate ${track.sampleRateHz} Hz is not 44100 or 48000 Hz`,
+      });
+    }
+
+    if (isPcm && track.bitDepth > 0 && !PCM_BIT_DEPTHS.has(track.bitDepth)) {
+      problems.push({
+        rule: "preview-audio-bit-depth",
+        message: `PCM audio is ${track.bitDepth}-bit; Apple accepts 16-, 24-, or 32-bit`,
+      });
+    }
+  }
+
+  return problems;
+}
 
 function previewCodecProblem(name: string, codecFourCC: string | null): string | null {
   if (codecFourCC === null) {
@@ -182,10 +292,51 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         emit("preview-format", locale.locale, `cannot parse app preview: ${reason}`, file.name);
         continue;
       }
-      const { durationSeconds, width, height, codecFourCC } = file.parse.info;
+      const {
+        durationSeconds,
+        width,
+        height,
+        codecFourCC,
+        frameRate,
+        avc,
+        audioTracks,
+        videoTrackEnabled,
+      } = file.parse.info;
       const codecProblem = previewCodecProblem(file.name, codecFourCC);
       if (codecProblem !== null) {
         emit("preview-codec", locale.locale, codecProblem, file.name);
+      }
+
+      if (frameRate !== null && frameRate > MAX_PREVIEW_FPS) {
+        emit(
+          "preview-frame-rate",
+          locale.locale,
+          `${formatRate(frameRate)} fps exceeds Apple's ${MAX_PREVIEW_FPS} fps maximum`,
+          file.name,
+        );
+      }
+
+      if (avc !== null && (avc.profileIndication > H264_MAX_PROFILE || avc.levelIndication > H264_MAX_LEVEL)) {
+        emit(
+          "preview-h264-profile",
+          locale.locale,
+          `H.264 ${profileName(avc.profileIndication)} Profile Level ${levelName(avc.levelIndication)} exceeds Apple's High Profile Level 4.0`,
+          file.name,
+        );
+      }
+
+      if (!videoTrackEnabled) {
+        emit("preview-track-disabled", locale.locale, "video track is not enabled", file.name);
+      }
+      for (const track of audioTracks) {
+        if (!track.enabled) {
+          emit("preview-track-disabled", locale.locale, "an audio track is not enabled", file.name);
+          break;
+        }
+      }
+
+      for (const problem of audioProblems(audioTracks, codecFourCC)) {
+        emit(problem.rule, locale.locale, problem.message, file.name);
       }
       if (durationSeconds < MIN_PREVIEW_SECONDS || durationSeconds > MAX_PREVIEW_SECONDS) {
         emit(

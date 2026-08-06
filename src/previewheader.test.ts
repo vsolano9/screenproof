@@ -5,7 +5,15 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { parsePreviewFile, parsePreviewHeader } from "./previewheader.ts";
-import { makePreview } from "./test-support/previews.ts";
+import { makePreview, makePreviewFile } from "./test-support/previews.ts";
+
+/** Parse a built fixture and return its info, failing loudly if it did not parse. */
+function infoOf(bytes: Uint8Array) {
+  const parsed = parsePreviewHeader(bytes);
+  assert.equal(parsed.ok, true, parsed.ok ? "" : `parse failed: ${parsed.reason}`);
+  if (!parsed.ok) throw new Error("unreachable");
+  return parsed.info;
+}
 
 function u32(value: number): Uint8Array {
   return new Uint8Array([
@@ -73,10 +81,69 @@ function preview(
 }
 
 test("parses duration and video dimensions from ISO base-media atoms", () => {
+  // This fixture is the bare minimum a movie can be: no mdhd, no stts, no audio
+  // track, and a tkhd whose flags are all zero. Everything the newer rules read
+  // is therefore absent, which is exactly the degrade path worth pinning.
   assert.deepEqual(parsePreviewHeader(preview()), {
     ok: true,
-    info: { durationSeconds: 20, width: 886, height: 1920, codecFourCC: "avc1" },
+    info: {
+      durationSeconds: 20,
+      width: 886,
+      height: 1920,
+      codecFourCC: "avc1",
+      frameRate: null,
+      avc: null,
+      audioTracks: [],
+      videoTrackEnabled: false,
+    },
   });
+});
+
+test("reads a constant frame rate exactly from mdhd and stts", () => {
+  for (const frameRate of [24, 25, 30, 60]) {
+    assert.equal(infoOf(makePreviewFile({ frameRate })).frameRate, frameRate);
+  }
+});
+
+test("reports a null frame rate when the sample table is absent", () => {
+  assert.equal(infoOf(makePreviewFile({ frameRate: null })).frameRate, null);
+});
+
+test("reads H.264 profile and level from avcC", () => {
+  assert.deepEqual(infoOf(makePreviewFile()).avc, { profileIndication: 100, levelIndication: 40 });
+  assert.deepEqual(
+    infoOf(makePreviewFile({ avc: { profileIndication: 77, levelIndication: 41 } })).avc,
+    { profileIndication: 77, levelIndication: 41 },
+  );
+});
+
+test("reports a null avcC for a preview that omits it or is not H.264", () => {
+  assert.equal(infoOf(makePreviewFile({ avc: null })).avc, null);
+  assert.equal(infoOf(makePreviewFile({ codecFourCC: "apch", avc: null })).avc, null);
+});
+
+test("reads every audio track's codec, channels, sample rate, and bit depth", () => {
+  const info = infoOf(makePreviewFile({
+    audio: [
+      { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 48_000, bitDepth: 16 },
+      { codecFourCC: "sowt", channelCount: 1, sampleRateHz: 48_000, bitDepth: 24 },
+    ],
+  }));
+  assert.deepEqual(info.audioTracks, [
+    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 48_000, bitDepth: 16, enabled: true },
+    { codecFourCC: "sowt", channelCount: 1, sampleRateHz: 48_000, bitDepth: 24, enabled: true },
+  ]);
+});
+
+test("reports an empty audio track list for a silent preview", () => {
+  assert.deepEqual(infoOf(makePreviewFile({ audio: [] })).audioTracks, []);
+});
+
+test("reads the track_enabled flag for video and audio tracks", () => {
+  assert.equal(infoOf(makePreviewFile({ videoTrackEnabled: false })).videoTrackEnabled, false);
+  const info = infoOf(makePreviewFile({ audio: [{ channelCount: 2, enabled: false }] }));
+  assert.equal(info.videoTrackEnabled, true);
+  assert.equal(info.audioTracks[0]?.enabled, false);
 });
 
 test("extracts supported H.264 and ProRes sample-entry FourCC values", () => {
@@ -164,7 +231,18 @@ test("file parsing skips media payload atoms and reads moov metadata", async () 
   await writeFile(path, makePreview(25, 1920, 1080, 1_000_000));
   assert.deepEqual(await parsePreviewFile(path), {
     ok: true,
-    info: { durationSeconds: 25, width: 1920, height: 1080, codecFourCC: "avc1" },
+    info: {
+      durationSeconds: 25,
+      width: 1920,
+      height: 1080,
+      codecFourCC: "avc1",
+      frameRate: 30,
+      avc: { profileIndication: 100, levelIndication: 40 },
+      audioTracks: [
+        { codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+      ],
+      videoTrackEnabled: true,
+    },
   });
 });
 

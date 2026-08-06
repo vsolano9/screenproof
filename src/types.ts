@@ -47,12 +47,44 @@ export interface ImageInfo {
 
 export type ParseResult = { ok: true; info: ImageInfo } | { ok: false; reason: string };
 
+/** H.264 configuration read from the `avcC` box of an `avc1`/`avc3` sample entry. */
+export interface AvcConfig {
+  /** `AVCProfileIndication`: 66 Baseline, 77 Main, 88 Extended, 100 High. */
+  profileIndication: number;
+  /** `AVCLevelIndication` in tenths, so level 4.0 is `40` and 4.1 is `41`. */
+  levelIndication: number;
+}
+
+/** One audio track's declared configuration. */
+export interface PreviewAudioTrack {
+  /** Sample-entry FourCC, e.g. `mp4a` for AAC or `lpcm`/`sowt`/`twos` for PCM. */
+  codecFourCC: string;
+  channelCount: number;
+  /** Sample rate in hertz, e.g. `44100`. */
+  sampleRateHz: number;
+  /** Declared sample size in bits. Only meaningful for PCM. */
+  bitDepth: number;
+  /** False when the track header's `track_enabled` flag is clear. */
+  enabled: boolean;
+}
+
 export interface PreviewInfo {
   durationSeconds: number;
   width: number;
   height: number;
   /** Video sample-entry FourCC from `stsd`, or null when no entry is declared. */
   codecFourCC: string | null;
+  /**
+   * Frames per second, or null when the sample table does not allow a reading.
+   * Exact for constant frame rate; the average over the track otherwise.
+   */
+  frameRate: number | null;
+  /** H.264 configuration, or null for non-H.264 tracks and missing `avcC`. */
+  avc: AvcConfig | null;
+  /** Every audio track in the movie, in file order. */
+  audioTracks: PreviewAudioTrack[];
+  /** False when the video track header's `track_enabled` flag is clear. */
+  videoTrackEnabled: boolean;
 }
 
 export type PreviewParseResult =

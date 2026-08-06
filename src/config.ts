@@ -34,6 +34,15 @@ export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
   "preview-duration": "error",
   "preview-resolution": "error",
   "preview-count-over": "error",
+  "preview-frame-rate": "error",
+  "preview-h264-profile": "error",
+  "preview-audio-missing": "error",
+  "preview-audio-layout": "error",
+  "preview-audio-codec": "error",
+  "preview-audio-sample-rate": "error",
+  "preview-audio-bit-depth": "error",
+  // Apple writes "all tracks should be enabled", not "must".
+  "preview-track-disabled": "warning",
 };
 
 /** A fresh default configuration. */

@@ -3,9 +3,11 @@ import { test } from "node:test";
 
 import { defaultConfig } from "./config.ts";
 import type {
+  AvcConfig,
   Config,
   Finding,
   LocaleScan,
+  PreviewAudioTrack,
   PreviewFile,
   ScanResult,
   ScreenshotFile,
@@ -25,13 +27,27 @@ function badFile(name: string, locale: string, reason: string): ScreenshotFile {
   return { path: `/x/${locale}/${name}`, name, locale, parse: { ok: false, reason } };
 }
 
+/** One conforming stereo AAC track, so a fixture only states what it breaks. */
+const STEREO_AAC: PreviewAudioTrack[] = [
+  { codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+];
+
 function preview(
   name: string,
   locale: string,
   durationSeconds: number,
   width: number,
   height: number,
-  opts: { sizeBytes?: number; supported?: boolean; reason?: string; codecFourCC?: string | null } = {},
+  opts: {
+    sizeBytes?: number;
+    supported?: boolean;
+    reason?: string;
+    codecFourCC?: string | null;
+    frameRate?: number | null;
+    avc?: AvcConfig | null;
+    audioTracks?: PreviewAudioTrack[];
+    videoTrackEnabled?: boolean;
+  } = {},
 ): PreviewFile {
   return {
     path: `/x/${locale}/${name}`,
@@ -48,6 +64,10 @@ function preview(
             width,
             height,
             codecFourCC: opts.codecFourCC === undefined ? "avc1" : opts.codecFourCC,
+            frameRate: opts.frameRate === undefined ? 30 : opts.frameRate,
+            avc: opts.avc === undefined ? { profileIndication: 100, levelIndication: 40 } : opts.avc,
+            audioTracks: opts.audioTracks ?? STEREO_AAC,
+            videoTrackEnabled: opts.videoTrackEnabled ?? true,
           },
         },
   };
@@ -373,6 +393,185 @@ test("app-preview format, size, duration, and resolution rules are independent",
   assert.equal(byRule(report, "preview-file-size").length, 1);
   assert.equal(byRule(report, "preview-duration").length, 1);
   assert.equal(byRule(report, "preview-resolution").length, 1);
+});
+
+test("a fully conforming app preview raises nothing", () => {
+  const report = validate(
+    scanResult([localeScan("en-US", [], { previews: [preview("ok.mp4", "en-US", 20, 886, 1920)] })]),
+    defaultConfig(),
+  );
+  assert.deepEqual(report.findings, []);
+  assert.equal(report.ok, true);
+});
+
+test("app-preview frame rate is capped at 30 fps", () => {
+  const previews = [
+    preview("sixty.mp4", "en-US", 20, 886, 1920, { frameRate: 60 }),
+    preview("thirty.mp4", "en-US", 20, 886, 1920, { frameRate: 30 }),
+    preview("ntsc.mp4", "en-US", 20, 886, 1920, { frameRate: 29.97 }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-frame-rate",
+  );
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.file, "sixty.mp4");
+  assert.match(findings[0]!.message, /60 fps exceeds Apple's 30 fps maximum/);
+});
+
+test("app-preview frame rate is not judged when the sample table cannot supply one", () => {
+  const previews = [preview("unknown.mp4", "en-US", 20, 886, 1920, { frameRate: null })];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(byRule(report, "preview-frame-rate"), []);
+});
+
+test("H.264 above High Profile Level 4.0 is rejected, at or below is accepted", () => {
+  const previews = [
+    preview("high40.mp4", "en-US", 20, 886, 1920, { avc: { profileIndication: 100, levelIndication: 40 } }),
+    preview("main31.mp4", "en-US", 20, 886, 1920, { avc: { profileIndication: 77, levelIndication: 31 } }),
+    preview("high41.mp4", "en-US", 20, 886, 1920, { avc: { profileIndication: 100, levelIndication: 41 } }),
+    preview("high10.mp4", "en-US", 20, 886, 1920, { avc: { profileIndication: 110, levelIndication: 40 } }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-h264-profile",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["high10.mp4", "high41.mp4"]);
+  assert.match(
+    findings.find((f) => f.file === "high41.mp4")!.message,
+    /H\.264 High Profile Level 4\.1 exceeds Apple's High Profile Level 4\.0/,
+  );
+  assert.match(findings.find((f) => f.file === "high10.mp4")!.message, /High 10 Profile Level 4\.0/);
+});
+
+test("a preview with no avcC is not judged on profile", () => {
+  const previews = [preview("prores.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", avc: null })];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(byRule(report, "preview-h264-profile"), []);
+});
+
+test("a silent app preview is reported once, not as a layout problem", () => {
+  const previews = [preview("silent.mp4", "en-US", 20, 886, 1920, { audioTracks: [] })];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  const missing = byRule(report, "preview-audio-missing");
+  assert.equal(missing.length, 1);
+  assert.match(missing[0]!.message, /no audio track; Apple requires stereo audio/);
+  assert.deepEqual(byRule(report, "preview-audio-layout"), []);
+});
+
+test("stereo is accepted as one 2-channel track or two 1-channel tracks", () => {
+  const oneTrack = [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
+  const twoTracks = [
+    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+  ];
+  for (const audioTracks of [oneTrack, twoTracks]) {
+    const previews = [preview("a.mp4", "en-US", 20, 886, 1920, { audioTracks })];
+    const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+    assert.deepEqual(byRule(report, "preview-audio-layout"), []);
+  }
+});
+
+test("mono and surround audio are rejected as not stereo", () => {
+  const mono = [{ codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
+  const surround = [{ codecFourCC: "mp4a", channelCount: 6, sampleRateHz: 48_000, bitDepth: 16, enabled: true }];
+  const previews = [
+    preview("mono.mp4", "en-US", 20, 886, 1920, { audioTracks: mono }),
+    preview("surround.mp4", "en-US", 20, 886, 1920, { audioTracks: surround }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-audio-layout",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["mono.mp4", "surround.mp4"]);
+  assert.match(findings[0]!.message, /1 track\(s\) with 1 channel\(s\)/);
+});
+
+test("PCM audio is accepted with ProRes and rejected with H.264", () => {
+  const pcm = [{ codecFourCC: "sowt", channelCount: 2, sampleRateHz: 48_000, bitDepth: 24, enabled: true }];
+  const previews = [
+    preview("prores.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm }),
+    preview("h264.mp4", "en-US", 20, 886, 1920, { codecFourCC: "avc1", audioTracks: pcm }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-audio-codec",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["h264.mp4"]);
+  assert.match(findings[0]!.message, /PCM, which Apple accepts only with ProRes 422 HQ/);
+});
+
+test("an audio codec that is neither AAC nor PCM is rejected on any video codec", () => {
+  const mp3 = [{ codecFourCC: ".mp3", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
+  const previews = [preview("mp3.mp4", "en-US", 20, 886, 1920, { audioTracks: mp3 })];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-audio-codec",
+  );
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /\.mp3 is not accepted; use 256 kbps AAC/);
+});
+
+test("audio sample rate must be 44.1 or 48 kHz", () => {
+  const rate = (hz: number) => [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: hz, bitDepth: 16, enabled: true }];
+  const previews = [
+    preview("ok-441.mp4", "en-US", 20, 886, 1920, { audioTracks: rate(44_100) }),
+    preview("ok-48.mp4", "en-US", 20, 886, 1920, { audioTracks: rate(48_000) }),
+    preview("low.mp4", "en-US", 20, 886, 1920, { audioTracks: rate(22_050) }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-audio-sample-rate",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["low.mp4"]);
+  assert.match(findings[0]!.message, /22050 Hz is not 44100 or 48000 Hz/);
+});
+
+test("PCM bit depth must be 16, 24, or 32, and is not judged for AAC", () => {
+  const pcm = (bits: number) => [{ codecFourCC: "sowt", channelCount: 2, sampleRateHz: 48_000, bitDepth: bits, enabled: true }];
+  const previews = [
+    preview("pcm24.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm(24) }),
+    preview("pcm8.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm(8) }),
+    preview("aac8.mp4", "en-US", 20, 886, 1920, {
+      audioTracks: [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 8, enabled: true }],
+    }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-audio-bit-depth",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["pcm8.mov"]);
+});
+
+test("a disabled track warns once per file, for video or audio", () => {
+  const previews = [
+    preview("novideo.mp4", "en-US", 20, 886, 1920, { videoTrackEnabled: false }),
+    preview("noaudio.mp4", "en-US", 20, 886, 1920, {
+      audioTracks: [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: false }],
+    }),
+  ];
+  const findings = byRule(
+    validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
+    "preview-track-disabled",
+  );
+  assert.deepEqual(findings.map((f) => f.file), ["noaudio.mp4", "novideo.mp4"]);
+  assert.ok(findings.every((f) => f.severity === "warning"));
+});
+
+test("each new preview rule can be turned off on its own", () => {
+  const previews = [preview("bad.mp4", "en-US", 20, 886, 1920, {
+    frameRate: 60,
+    avc: { profileIndication: 100, levelIndication: 41 },
+    audioTracks: [],
+    videoTrackEnabled: false,
+  })];
+  const config = defaultConfig();
+  for (const rule of ["preview-frame-rate", "preview-h264-profile", "preview-audio-missing", "preview-track-disabled"]) {
+    config.rules[rule] = "off";
+  }
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), config);
+  assert.deepEqual(report.findings, []);
+  assert.equal(report.ok, true);
 });
 
 test("app-preview count is capped at three per device size per localization", () => {

@@ -29,6 +29,7 @@ export { exitCode, renderHuman, renderJson } from "./report.ts";
 export { IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS, listMetadataLocales, scan } from "./scan.ts";
 export { validate } from "./validate.ts";
 export type {
+  AvcConfig,
   Config,
   DeviceClass,
   DimensionOverrides,
@@ -40,6 +41,7 @@ export type {
   Orientation,
   ParseResult,
   Platform,
+  PreviewAudioTrack,
   PreviewFile,
   PreviewInfo,
   PreviewParseResult,

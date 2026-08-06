@@ -76,7 +76,29 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
 | `preview-count-over` | error | A localization contains more than three app previews for one device size. Apple's cap is three "per supported device size and language", so iPhone and iPad previews have separate budgets; portrait and landscape share one, since they are the same upload slot. |
 
+| `preview-frame-rate` | error | An app preview runs faster than Apple's 30 fps maximum. A 60 fps simulator recording is the usual cause. |
+| `preview-h264-profile` | error | H.264 above High Profile Level 4.0, read from the `avcC` box. |
+| `preview-audio-missing` | error | An app preview has no audio track. Apple requires stereo audio, and a silent screen recording is the usual cause. |
+| `preview-audio-layout` | error | Audio is not stereo. Apple accepts one 2-channel track or two 1-channel tracks. |
+| `preview-audio-codec` | error | Audio is not 256 kbps AAC. PCM is accepted only alongside ProRes 422 HQ. |
+| `preview-audio-sample-rate` | error | Audio is not sampled at 44.1 kHz or 48 kHz. |
+| `preview-audio-bit-depth` | error | PCM audio is not 16-, 24-, or 32-bit. Not applied to AAC. |
+| `preview-track-disabled` | warning | A video or audio track's `track_enabled` flag is clear. Apple writes that all tracks *should* be enabled, so this warns rather than fails. |
+
 Enable the opt-in rules via config: `{ "rules": { "screenshot-locale-parity": "warning" } }`.
+
+### Two documented requirements screenproof does not check
+
+Apple's app-preview specification lists two things this tool deliberately leaves
+alone, because reading them honestly is not possible from container metadata:
+
+- **Progressive vs interlaced.** Answering it means decoding the H.264 sequence
+  parameter set (`frame_mbs_only_flag`) or trusting a QuickTime `fiel` atom that
+  most encoders never write. screenproof reads structure, never encoded media.
+- **Target bit rate** (10-12 Mbps for H.264, ~220 Mbps for ProRes). Apple states
+  a target, not a limit, and a figure derived from file size over duration folds
+  in audio and container overhead. A rule built on it would warn on conforming
+  files, which is worse than no rule.
 
 ## Accepted sizes
 
@@ -184,7 +206,7 @@ Release history, including which changes can flip a run's result, is in
 ## Roadmap
 
 - [x] App preview checks: duration, per-device-size count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
-- [ ] Fixture-backed app-preview H.264 profile, audio, bitrate, frame-rate, and rotation checks.
+- [x] Fixture-backed app-preview H.264 profile/level, audio, and frame-rate checks. Bit rate and interlacing are [deliberately out of scope](#two-documented-requirements-screenproof-does-not-check); rotation carries no Apple requirement to enforce.
 - [x] `tRNS`-chunk PNG transparency detection.
 
 ## License

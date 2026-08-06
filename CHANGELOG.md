@@ -6,6 +6,58 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## [0.4.0] - 2026-08-06
+
+Verified against Apple's app-preview specification and the App Store Connect
+upload page, both re-read 2026-08-06.
+
+### Added
+
+Eight rules covering the parts of Apple's preview specification that were
+documented but never enforced. All read container structure only — no media is
+decoded.
+
+- `preview-frame-rate` (error): faster than Apple's 30 fps maximum, computed
+  from the video track's `mdhd` timescale and `stts` sample table. Exact for
+  constant frame rate, averaged otherwise. A 60 fps simulator recording is the
+  usual cause, and nothing caught it before.
+- `preview-h264-profile` (error): H.264 above High Profile Level 4.0, read from
+  the `avcC` box.
+- `preview-audio-missing` (error): no audio track at all. Apple requires stereo
+  audio; a silent screen recording is the usual cause.
+- `preview-audio-layout` (error): audio that is not stereo, accepting either one
+  2-channel track or two 1-channel tracks, as Apple specifies.
+- `preview-audio-codec` (error): audio that is not AAC. PCM is accepted only
+  alongside ProRes 422 HQ.
+- `preview-audio-sample-rate` (error): audio not sampled at 44.1 or 48 kHz.
+- `preview-audio-bit-depth` (error): PCM audio that is not 16-, 24-, or 32-bit.
+  Not applied to AAC, where the field is not a bit depth.
+- `preview-track-disabled` (warning): a track whose `track_enabled` flag is
+  clear. Apple writes that tracks *should* be enabled, so this warns.
+
+`PreviewInfo` now carries `frameRate`, `avc`, `audioTracks`, and
+`videoTrackEnabled`; `AvcConfig` and `PreviewAudioTrack` are exported.
+
+### Changed
+
+- **A preview that passed 0.3.0 can fail 0.4.0.** That is the point: on a
+  five-file sample, 0.3.0 reported one problem and 0.4.0 reported six. Each rule
+  can be disabled on its own through `rules`.
+
+### Not implemented, on purpose
+
+Two documented requirements are left alone rather than guessed at, and the
+reasons are in the README and in `previewheader.ts`:
+
+- **Progressive vs interlaced** needs the H.264 sequence parameter set or a
+  `fiel` atom most encoders never write. Neither is container metadata.
+- **Target bit rate** (10-12 Mbps H.264, ~220 Mbps ProRes) is a target, not a
+  limit, and a figure derived from file size over duration folds in audio and
+  container overhead. The rule would warn on conforming files.
+
+Rotation is readable from the `tkhd` matrix but carries no Apple requirement to
+enforce, so no rule was added and the field was left off the public type.
+
 ## [0.3.0] - 2026-08-06
 
 ### Fixed
@@ -79,6 +131,7 @@ called out below.
 - CLI with locale and flat modes, `--json`, `--strict`, `--quiet`, `--no-color`,
   `--config`, and `--metadata`, plus a programmatic API and a GitHub Action.
 
+[0.4.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.3.0
 [0.2.1]: https://github.com/vsolano9/screenproof/releases/tag/v0.2.1
 [0.2.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.2.0
