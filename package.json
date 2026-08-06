@@ -1,6 +1,6 @@
 {
   "name": "screenproof",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Lint App Store screenshots and app previews against Apple's published dimensions, format, duration, file-size, and count rules. Offline, zero dependencies.",
   "type": "module",
   "bin": {
@@ -16,6 +16,7 @@
     "dist",
     "action.yml",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {

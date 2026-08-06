@@ -10,7 +10,7 @@ import { extname } from "node:path";
 
 import { DEFAULT_RULES } from "./config.ts";
 import { applyDimensionOverrides, classify, DEFAULT_CLASSES, nearestValidSize } from "./dimensions.ts";
-import { isAcceptedPreviewSize } from "./previewdimensions.ts";
+import { classifyPreviewSize } from "./previewdimensions.ts";
 import type {
   Config,
   Finding,
@@ -26,9 +26,16 @@ export interface ValidateOptions {
   metadataLocales?: string[] | null;
 }
 
-/** Apple's limit: screenshots per device size per localization. */
+/**
+ * Apple's per-localization ceilings.
+ *
+ * "You can upload up to three app previews per supported device size and
+ * language" — App Store Connect Help, Upload app previews and screenshots,
+ * read 2026-08-06:
+ * https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots
+ */
 const MAX_PER_CLASS = 10;
-const MAX_PREVIEWS_PER_LOCALE = 3;
+const MAX_PREVIEWS_PER_CLASS = 3;
 const MAX_PREVIEW_BYTES = 500_000_000;
 const MIN_PREVIEW_SECONDS = 15;
 const MAX_PREVIEW_SECONDS = 30;
@@ -119,6 +126,7 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     }
 
     const countByClass = new Map<string, { label: string; count: number }>();
+    const previewCountByClass = new Map<string, { label: string; count: number }>();
     const presentPlatforms = new Set<string>();
     const presentClassIds = new Set<string>();
 
@@ -187,23 +195,33 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
           file.name,
         );
       }
-      if (!isAcceptedPreviewSize(width, height)) {
+      const sizeClass = classifyPreviewSize(width, height);
+      if (sizeClass === null) {
         emit(
           "preview-resolution",
           locale.locale,
           `${width}x${height} does not match any accepted App Store app-preview resolution`,
           file.name,
         );
+        continue;
       }
+      // Portrait and landscape are one App Store Connect slot, so they share a
+      // budget. A preview Apple lists no resolution for cannot be assigned to a
+      // slot at all, and has already been reported above.
+      const entry = previewCountByClass.get(sizeClass.id) ?? { label: sizeClass.label, count: 0 };
+      entry.count += 1;
+      previewCountByClass.set(sizeClass.id, entry);
     }
 
     if (localeRules) {
-      if (previews.length > MAX_PREVIEWS_PER_LOCALE) {
-        emit(
-          "preview-count-over",
-          locale.locale,
-          `${previews.length} app previews in this localization (max ${MAX_PREVIEWS_PER_LOCALE})`,
-        );
+      for (const { label, count } of previewCountByClass.values()) {
+        if (count > MAX_PREVIEWS_PER_CLASS) {
+          emit(
+            "preview-count-over",
+            locale.locale,
+            `${count} app previews for ${label} (max ${MAX_PREVIEWS_PER_CLASS} per device size per localization)`,
+          );
+        }
       }
       for (const { label, count } of countByClass.values()) {
         if (count > MAX_PER_CLASS) {

@@ -74,7 +74,7 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `preview-file-size` | error | An app preview exceeds Apple's 500 MB limit. |
 | `preview-duration` | error | An app preview is shorter than 15 seconds or longer than 30 seconds. |
 | `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
-| `preview-count-over` | error | A localization contains more than three app previews. |
+| `preview-count-over` | error | A localization contains more than three app previews for one device size. Apple's cap is three "per supported device size and language", so iPhone and iPad previews have separate budgets; portrait and landscape share one, since they are the same upload slot. |
 
 Enable the opt-in rules via config: `{ "rules": { "screenshot-locale-parity": "warning" } }`.
 
@@ -176,9 +176,14 @@ npm test       # node --test
 npm run build  # compile dist/
 ```
 
+## Changelog
+
+Release history, including which changes can flip a run's result, is in
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Roadmap
 
-- [x] App preview checks: duration, count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
+- [x] App preview checks: duration, per-device-size count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
 - [ ] Fixture-backed app-preview H.264 profile, audio, bitrate, frame-rate, and rotation checks.
 - [x] `tRNS`-chunk PNG transparency detection.
 

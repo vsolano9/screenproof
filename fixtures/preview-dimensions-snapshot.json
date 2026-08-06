@@ -2,16 +2,145 @@
   "verifiedOn": "2026-07-19",
   "source": "https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications",
   "sizes": [
-    { "width": 886, "height": 1920 },
-    { "width": 1920, "height": 886 },
-    { "width": 1080, "height": 1920 },
-    { "width": 1920, "height": 1080 },
-    { "width": 750, "height": 1334 },
-    { "width": 1334, "height": 750 },
-    { "width": 1200, "height": 1600 },
-    { "width": 1600, "height": 1200 },
-    { "width": 900, "height": 1200 },
-    { "width": 1200, "height": 900 },
-    { "width": 3840, "height": 2160 }
+    {
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "width": 1920,
+      "height": 886
+    },
+    {
+      "width": 1080,
+      "height": 1920
+    },
+    {
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "width": 750,
+      "height": 1334
+    },
+    {
+      "width": 1334,
+      "height": 750
+    },
+    {
+      "width": 1200,
+      "height": 1600
+    },
+    {
+      "width": 1600,
+      "height": 1200
+    },
+    {
+      "width": 900,
+      "height": 1200
+    },
+    {
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "width": 3840,
+      "height": 2160
+    }
+  ],
+  "classes": [
+    {
+      "id": "iphone-886x1920",
+      "label": "iPhone 886x1920",
+      "displays": [
+        "6.9-inch",
+        "6.5-inch",
+        "6.3-inch",
+        "6.1-inch"
+      ],
+      "portrait": {
+        "width": 886,
+        "height": 1920
+      },
+      "landscape": {
+        "width": 1920,
+        "height": 886
+      }
+    },
+    {
+      "id": "iphone-1080x1920",
+      "label": "iPhone 1080x1920",
+      "displays": [
+        "5.5-inch",
+        "4.0-inch"
+      ],
+      "portrait": {
+        "width": 1080,
+        "height": 1920
+      },
+      "landscape": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "id": "iphone-750x1334",
+      "label": "iPhone 750x1334",
+      "displays": [
+        "4.7-inch"
+      ],
+      "portrait": {
+        "width": 750,
+        "height": 1334
+      },
+      "landscape": {
+        "width": 1334,
+        "height": 750
+      }
+    },
+    {
+      "id": "ipad-1200x1600",
+      "label": "iPad 1200x1600",
+      "displays": [
+        "13-inch",
+        "12.9-inch (2nd gen)",
+        "11-inch",
+        "10.5-inch"
+      ],
+      "portrait": {
+        "width": 1200,
+        "height": 1600
+      },
+      "landscape": {
+        "width": 1600,
+        "height": 1200
+      }
+    },
+    {
+      "id": "ipad-900x1200",
+      "label": "iPad 900x1200",
+      "displays": [
+        "12.9-inch (2nd gen)",
+        "9.7-inch"
+      ],
+      "portrait": {
+        "width": 900,
+        "height": 1200
+      },
+      "landscape": {
+        "width": 1200,
+        "height": 900
+      }
+    },
+    {
+      "id": "vision-3840x2160",
+      "label": "Apple Vision Pro 3840x2160",
+      "displays": [
+        "Apple Vision Pro"
+      ],
+      "landscape": {
+        "width": 3840,
+        "height": 2160
+      }
+    }
   ]
 }

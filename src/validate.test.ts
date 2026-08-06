@@ -375,7 +375,7 @@ test("app-preview format, size, duration, and resolution rules are independent",
   assert.equal(byRule(report, "preview-resolution").length, 1);
 });
 
-test("app-preview count is capped at three per localization", () => {
+test("app-preview count is capped at three per device size per localization", () => {
   const previews = Array.from({ length: 4 }, (_, index) =>
     preview(`${index}.mp4`, "en-US", 20, 886, 1920),
   );
@@ -385,7 +385,52 @@ test("app-preview count is capped at three per localization", () => {
   );
   const findings = byRule(report, "preview-count-over");
   assert.equal(findings.length, 1);
-  assert.match(findings[0]!.message, /4 app previews .*\(max 3\)/);
+  assert.match(findings[0]!.message, /4 app previews for iPhone 886x1920 \(max 3 per device size per localization\)/);
+});
+
+test("app-preview count does not add unrelated device sizes together", () => {
+  // Apple allows three previews per device size per localization, so three
+  // iPhone plus three iPad previews in one locale is legal, not six over cap.
+  const previews = [
+    ...Array.from({ length: 3 }, (_, i) => preview(`iphone-${i}.mp4`, "en-US", 20, 886, 1920)),
+    ...Array.from({ length: 3 }, (_, i) => preview(`ipad-${i}.mp4`, "en-US", 20, 1200, 1600)),
+  ];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(byRule(report, "preview-count-over"), []);
+  assert.equal(report.ok, true);
+});
+
+test("app-preview count pairs portrait with landscape of the same device size", () => {
+  // Portrait and landscape are the same App Store Connect slot, so they share
+  // one budget of three.
+  const previews = [
+    preview("a.mp4", "en-US", 20, 886, 1920),
+    preview("b.mp4", "en-US", 20, 1920, 886),
+    preview("c.mp4", "en-US", 20, 886, 1920),
+    preview("d.mp4", "en-US", 20, 1920, 886),
+  ];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.equal(byRule(report, "preview-count-over").length, 1);
+});
+
+test("app-preview count reports each over-cap device size separately", () => {
+  const previews = [
+    ...Array.from({ length: 4 }, (_, i) => preview(`iphone-${i}.mp4`, "en-US", 20, 886, 1920)),
+    ...Array.from({ length: 5 }, (_, i) => preview(`ipad-${i}.mp4`, "en-US", 20, 1200, 1600)),
+  ];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  const findings = byRule(report, "preview-count-over");
+  assert.equal(findings.length, 2);
+  assert.match(findings.map((f) => f.message).join("\n"), /4 app previews for iPhone 886x1920/);
+  assert.match(findings.map((f) => f.message).join("\n"), /5 app previews for iPad 1200x1600/);
+});
+
+test("app-preview count ignores previews whose resolution Apple does not accept", () => {
+  // Those already fail preview-resolution; they cannot be assigned to a size.
+  const previews = Array.from({ length: 4 }, (_, i) => preview(`odd-${i}.mp4`, "en-US", 20, 640, 480));
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(byRule(report, "preview-count-over"), []);
+  assert.equal(byRule(report, "preview-resolution").length, 4);
 });
 
 test("app-preview duration bounds are inclusive and flat mode skips only the count rule", () => {
