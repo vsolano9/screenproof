@@ -10,7 +10,7 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 - Device-class detection by pixel resolution, mirroring deliver's behavior including the iPad 12.9"/13" and Apple TV/Vision Pro shared-resolution disambiguation.
 - Per-locale checks: counts over Apple's 10-per-device limit, empty locale folders, typo locale names (`en_US`), stray files.
 - Optional cross-checks: locale parity across localizations, current-primary-size presence, and a `--metadata` comparison against your deliver metadata tree.
-- App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, H.264 or ProRes 422 HQ codec/container compatibility, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-localization limit.
+- App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, H.264 or ProRes 422 HQ codec/container compatibility, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-device-size limit in each localization.
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
 - Zero-dependency ISO base-media and QuickTime atom parsing that skips encoded media payloads.
 
@@ -75,7 +75,6 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `preview-duration` | error | An app preview is shorter than 15 seconds or longer than 30 seconds. |
 | `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
 | `preview-count-over` | error | A localization contains more than three app previews for one device size. Apple's cap is three "per supported device size and language", so iPhone and iPad previews have separate budgets; portrait and landscape share one, since they are the same upload slot. |
-
 | `preview-frame-rate` | error | An app preview runs faster than Apple's 30 fps maximum. A 60 fps simulator recording is the usual cause. |
 | `preview-h264-profile` | error | H.264 above High Profile Level 4.0, read from the `avcC` box. |
 | `preview-audio-missing` | error | An app preview has no audio track. Apple requires stereo audio, and a silent screen recording is the usual cause. |
@@ -161,15 +160,16 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.2.1
+- uses: vsolano9/screenproof@v0.4.0
   with:
     path: fastlane/screenshots
     strict: "true"
     metadata: fastlane/metadata
 ```
 
-The exact tag keeps CI reproducible and includes app-preview and `tRNS`
-transparency validation. The moving `@v0` tag currently remains on 0.1.2.
+The exact tag keeps CI reproducible and includes the complete shipped app-preview
+rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
+same `v0.4.0` release.
 
 ## Flat mode
 
@@ -187,7 +187,7 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
 - Rare JPEG variants outside baseline, extended, and progressive surface as parse findings rather than being silently accepted.
 - The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
-- App-preview H.264 profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet. The current parser validates the container, video sample-entry codec, movie duration, and video track display dimensions without decoding media.
+- Rotation matrices are not exposed because Apple publishes no rotation-matrix requirement to enforce. Progressive/interlaced video and target bit rate remain deliberately unchecked for the reasons above.
 - A malformed app preview with a `moov` atom larger than 64 MB is rejected to keep validation memory-bounded.
 
 ## Validation
