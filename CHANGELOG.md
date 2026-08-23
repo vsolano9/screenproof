@@ -6,6 +6,28 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## [0.5.0] - 2026-08-23
+
+Verified against Apple's screenshot and app-preview specification pages and
+fastlane deliver's current screenshot-resolution source, all re-read
+2026-08-23. The accepted resolution values are unchanged.
+
+### Added
+
+- `screenshot-watch-size-consistency` (error): Apple Watch screenshots must use
+  one exact pixel size across every localization that supplies Watch assets.
+  Localizations without Watch screenshots are ignored, and flat mode does not
+  run the cross-localization rule.
+
+### Changed
+
+- **A tree that passed 0.4.0 can fail 0.5.0.** Screenproof previously accepted
+  different valid Watch sizes in different localizations even though Apple
+  requires one size consistently across the app. The rule can be disabled on
+  its own through `rules`.
+- Refreshed screenshot and app-preview provenance dates after verifying the
+  live sources, and corrected the stale package-lock package version.
+
 ## [0.4.0] - 2026-08-06
 
 Verified against Apple's app-preview specification and the App Store Connect
@@ -131,6 +153,7 @@ enforce, so no rule was added and the field was left off the public type.
 - CLI with locale and flat modes, `--json`, `--strict`, `--quiet`, `--no-color`,
   `--config`, and `--metadata`, plus a programmatic API and a GitHub Action.
 
+[0.5.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.3.0
 [0.2.1]: https://github.com/vsolano9/screenproof/releases/tag/v0.2.1

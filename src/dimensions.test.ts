@@ -11,7 +11,7 @@ import {
 } from "./dimensions.ts";
 
 test("verification date is recorded", () => {
-  assert.equal(VERIFIED_ON, "2026-07-09");
+  assert.equal(VERIFIED_ON, "2026-08-23");
 });
 
 test("classifies key sizes to their device classes", () => {

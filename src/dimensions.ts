@@ -2,7 +2,7 @@
  * Apple's App Store screenshot device classes: the accepted exact pixel sizes
  * per device, and the logic to classify an image into a class.
  *
- * Sources (both fetched and cross-checked on 2026-07-09):
+ * Sources (both fetched and cross-checked on 2026-08-23):
  * - `apple`: App Store Connect screenshot specifications reference page.
  * - `deliver`: fastlane deliver's `app_screenshot.rb` resolution mapping,
  *   which is what actually gates a `deliver` upload.
@@ -15,7 +15,7 @@
 
 import type { DeviceClass, DimensionOverrides, Orientation, Size } from "./types.ts";
 
-export const VERIFIED_ON = "2026-07-09";
+export const VERIFIED_ON = "2026-08-23";
 
 const SOURCES = ["apple", "deliver"];
 

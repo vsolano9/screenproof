@@ -33,3 +33,20 @@ test("the executable exits 1 on a failing tree", async () => {
     (err: Error & { code?: number }) => err.code === 1,
   );
 });
+
+test("the executable exits 1 when Watch screenshot sizes differ by localization", async () => {
+  const root = await mkdtemp(join(tmpdir(), "screenproof-e2e-"));
+  await mkdir(join(root, "en-US"));
+  await mkdir(join(root, "de-DE"));
+  await writeFile(join(root, "en-US", "watch.png"), makePng(422, 514));
+  await writeFile(join(root, "de-DE", "watch.png"), makePng(410, 502));
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [CLI, root, "--json"]),
+    (err: Error & { code?: number; stdout?: string }) => {
+      if (err.code !== 1 || !err.stdout) return false;
+      const report = JSON.parse(err.stdout) as { findings: Array<{ rule: string }> };
+      return report.findings.filter((finding) => finding.rule === "screenshot-watch-size-consistency").length === 2;
+    },
+  );
+});

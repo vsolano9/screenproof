@@ -249,6 +249,72 @@ test("screenshot-locale-parity is off by default and compares against the union 
   assert.match(findings[0]!.message, /missing device classes present in other locales: ipad-13/);
 });
 
+test("Apple Watch screenshots must use one exact size across localizations", () => {
+  const scan = scanResult([
+    localeScan("en-US", [png("watch.png", "en-US", 422, 514)]),
+    localeScan("de-DE", [png("watch.png", "de-DE", 410, 502)]),
+  ]);
+  const findings = byRule(validate(scan, defaultConfig()), "screenshot-watch-size-consistency");
+  assert.equal(findings.length, 2);
+  assert.deepEqual(findings.map((finding) => finding.locale), ["en-US", "de-DE"]);
+  assert.ok(findings.every((finding) => finding.severity === "error"));
+  assert.ok(findings.every((finding) => /410x502, 422x514/.test(finding.message)));
+});
+
+test("matching Apple Watch sizes across localizations pass", () => {
+  const scan = scanResult([
+    localeScan("en-US", [png("watch.png", "en-US", 416, 496)]),
+    localeScan("de-DE", [png("watch.png", "de-DE", 416, 496)]),
+  ]);
+  assert.deepEqual(byRule(validate(scan, defaultConfig()), "screenshot-watch-size-consistency"), []);
+});
+
+test("Apple Watch consistency ignores locales without Watch screenshots", () => {
+  const scan = scanResult([
+    localeScan("en-US", [png("watch.png", "en-US", 396, 484)]),
+    localeScan("de-DE", [png("iphone.png", "de-DE", 1260, 2736)]),
+  ]);
+  assert.deepEqual(byRule(validate(scan, defaultConfig()), "screenshot-watch-size-consistency"), []);
+});
+
+test("mixing Apple Watch sizes inside one localization fails", () => {
+  const scan = scanResult([
+    localeScan("en-US", [
+      png("ultra.png", "en-US", 422, 514),
+      png("series.png", "en-US", 416, 496),
+    ]),
+  ]);
+  const findings = byRule(validate(scan, defaultConfig()), "screenshot-watch-size-consistency");
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]!.locale, "en-US");
+});
+
+test("Apple Watch consistency compares exact configured sizes, not only class ids", () => {
+  const config = defaultConfig();
+  config.dimensions = { "watch-s7": { portrait: [[396, 484], [400, 500]] } };
+  const scan = scanResult([
+    localeScan("en-US", [png("watch.png", "en-US", 396, 484)]),
+    localeScan("de-DE", [png("watch.png", "de-DE", 400, 500)]),
+  ]);
+  assert.equal(byRule(validate(scan, config), "screenshot-watch-size-consistency").length, 2);
+});
+
+test("Apple Watch consistency can be disabled and does not run in flat mode", () => {
+  const mixed = [png("ultra.png", "en-US", 422, 514), png("series.png", "en-US", 416, 496)];
+  const off = rules({ "screenshot-watch-size-consistency": "off" });
+  assert.deepEqual(
+    byRule(validate(scanResult([localeScan("en-US", mixed)]), off), "screenshot-watch-size-consistency"),
+    [],
+  );
+  assert.deepEqual(
+    byRule(
+      validate(scanResult([localeScan("", mixed)], { mode: "flat" }), defaultConfig()),
+      "screenshot-watch-size-consistency",
+    ),
+    [],
+  );
+});
+
 test("rule levels remap severity and off disables", () => {
   const scan = scanResult([localeScan("en-US", [badFile("bad.png", "en-US", "junk")])]);
   const remapped = validate(scan, rules({ "screenshot-format": "warning" }));

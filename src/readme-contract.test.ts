@@ -44,3 +44,13 @@ test("the limitations section does not deny shipped preview checks", async () =>
     /H\.264 profile, audio layout, bitrate, frame rate, and rotation-matrix checks are not enforced yet/,
   );
 });
+
+test("the rules table documents Apple Watch cross-localization consistency", async () => {
+  const { readme } = await readReleaseDocs();
+
+  assert.match(readme, /`screenshot-watch-size-consistency` \| error/);
+  assert.match(
+    readme,
+    /Apple requires one Apple Watch screenshot size to be used consistently across all localizations/,
+  );
+});

@@ -197,6 +197,8 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
 
   /** Device-class ids present per real locale, for parity. */
   const classIdsByLocale = new Map<string, Set<string>>();
+  /** Exact Apple Watch screenshot sizes present per real locale. */
+  const watchSizesByLocale = new Map<string, Set<string>>();
 
   for (const locale of scan.locales) {
     const isSyntheticRoot = scan.mode === "locale" && locale.locale === "";
@@ -239,6 +241,7 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     const previewCountByClass = new Map<string, { label: string; count: number }>();
     const presentPlatforms = new Set<string>();
     const presentClassIds = new Set<string>();
+    const presentWatchSizes = new Set<string>();
 
     for (const file of locale.files) {
       if (!file.parse.ok) {
@@ -276,6 +279,9 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       countByClass.set(deviceClass.id, entry);
       presentPlatforms.add(deviceClass.platform);
       presentClassIds.add(deviceClass.id);
+      if (deviceClass.platform === "watch") {
+        presentWatchSizes.add(`${width}x${height}`);
+      }
     }
 
     for (const file of previews) {
@@ -393,6 +399,9 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       if (locale.locale !== "default") {
         classIdsByLocale.set(locale.locale, presentClassIds);
       }
+      if (locale.isKnownLocale && presentWatchSizes.size > 0) {
+        watchSizesByLocale.set(locale.locale, presentWatchSizes);
+      }
     }
   }
 
@@ -416,6 +425,17 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         "screenshot-locale-parity",
         name,
         `missing device classes present in other locales: ${missing.join(", ")}`,
+      );
+    }
+  }
+
+  const watchSizes = [...new Set([...watchSizesByLocale.values()].flatMap((sizes) => [...sizes]))].sort();
+  if (watchSizes.length > 1) {
+    for (const [name, sizes] of watchSizesByLocale) {
+      emit(
+        "screenshot-watch-size-consistency",
+        name,
+        `Apple requires one Apple Watch screenshot size across all localizations; this locale uses ${[...sizes].sort().join(", ")}, while the app uses ${watchSizes.join(", ")}`,
       );
     }
   }

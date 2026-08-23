@@ -19,6 +19,7 @@ test("default rule levels match the plan", () => {
     "screenshot-locale-empty": "warning",
     "screenshot-primary-size-missing": "off",
     "screenshot-locale-parity": "off",
+    "screenshot-watch-size-consistency": "error",
     "preview-format": "error",
     "preview-codec": "error",
     "preview-file-size": "error",

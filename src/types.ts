@@ -31,7 +31,7 @@ export interface DeviceClass {
   platform: Platform;
   portrait: Size[];
   landscape: Size[];
-  /** Date the sizes were verified against the sources, e.g. `2026-07-09`. */
+  /** Date the sizes were verified against the sources, e.g. `2026-08-23`. */
   verifiedOn: string;
   /** Where the sizes come from: `apple` (spec page), `deliver` (fastlane source), `config`. */
   sources: string[];

@@ -19,7 +19,7 @@
 import type { Size } from "./types.ts";
 
 /** Last date the resolution table itself was read off Apple's page. */
-export const PREVIEW_VERIFIED_ON = "2026-07-19";
+export const PREVIEW_VERIFIED_ON = "2026-08-23";
 export const PREVIEW_SPEC_URL =
   "https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications";
 

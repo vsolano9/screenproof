@@ -8,7 +8,7 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 
 - Exact-size validation against Apple's current specification table, with the nearest valid size suggested for every rejected image (same aspect ratio preferred, so it never suggests a stretch).
 - Device-class detection by pixel resolution, mirroring deliver's behavior including the iPad 12.9"/13" and Apple TV/Vision Pro shared-resolution disambiguation.
-- Per-locale checks: counts over Apple's 10-per-device limit, empty locale folders, typo locale names (`en_US`), stray files.
+- Per-locale checks: counts over Apple's 10-per-device limit, required Apple Watch exact-size consistency across localizations, empty locale folders, typo locale names (`en_US`), stray files.
 - Optional cross-checks: locale parity across localizations, current-primary-size presence, and a `--metadata` comparison against your deliver metadata tree.
 - App-preview checks: `.mov`/`.m4v`/`.mp4` container structure, H.264 or ProRes 422 HQ codec/container compatibility, 500 MB size ceiling, 15 to 30 second duration, accepted resolution, and the three-per-device-size limit in each localization.
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
@@ -69,6 +69,7 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `screenshot-locale-empty` | warning | A locale folder has no screenshots or app previews; with `--metadata`, also a metadata locale with no screenshots folder. |
 | `screenshot-primary-size-missing` | off | A locale has iPhone or iPad screenshots but none at the platform's current primary size. Off by default because Apple auto-scales from the largest size. |
 | `screenshot-locale-parity` | off | A locale is missing a device class that other locales have. |
+| `screenshot-watch-size-consistency` | error | Apple Watch screenshots use more than one exact pixel size across the app's localizations. |
 | `preview-format` | error | A video uses an unsupported extension or its ISO base-media/QuickTime atoms cannot be parsed. |
 | `preview-codec` | error | A video has no codec sample entry, uses a codec other than H.264 (`avc1`/`avc3`) or ProRes 422 HQ (`apch`), or places ProRes 422 HQ in a non-`.mov` container. |
 | `preview-file-size` | error | An app preview exceeds Apple's 500 MB limit. |
@@ -101,7 +102,7 @@ alone, because reading them honestly is not possible from container metadata:
 
 ## Accepted sizes
 
-Verified against Apple's screenshot specifications page and fastlane deliver's source on **2026-07-09**. The shipped table is the union of both. Apple adds sizes with new hardware: if a size is missing here, extend it via `dimensions` in config the same day (see below), and expect updated releases after Apple device events.
+Verified against Apple's screenshot specifications page and fastlane deliver's source on **2026-08-23**. The shipped table is the union of both. Apple adds sizes with new hardware: if a size is missing here, extend it via `dimensions` in config the same day (see below), and expect updated releases after Apple device events.
 
 | Class id | Device | Portrait | Landscape |
 | --- | --- | --- | --- |
@@ -123,11 +124,13 @@ Verified against Apple's screenshot specifications page and fastlane deliver's s
 | `visionpro` | Apple Vision Pro | none | 3840x2160 (via `vision` in the file path) |
 | `watch-*` | Apple Watch (Ultra 3 to Series 3) | 422x514, 410x502, 416x496, 396x484, 368x448, 312x390 | none |
 
+Apple requires one Apple Watch screenshot size to be used consistently across all localizations for an app. `screenshot-watch-size-consistency` enforces that requirement using the exact pixel sizes above; localizations without Watch screenshots are ignored.
+
 Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` is the 13-inch iPad (add `IPAD_PRO_129`-style keywords for 2nd gen), and keywordless `3840x2160` is Apple TV (name the file `vision-...` for Vision Pro).
 
 ## Accepted app-preview sizes
 
-Verified against Apple's [app-preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications) on **2026-07-19**.
+Verified against Apple's [app-preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications) on **2026-08-23**.
 
 | Platform family | Accepted portrait | Accepted landscape |
 | --- | --- | --- |
@@ -160,7 +163,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.4.0
+- uses: vsolano9/screenproof@v0.5.0
   with:
     path: fastlane/screenshots
     strict: "true"
@@ -169,7 +172,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 
 The exact tag keeps CI reproducible and includes the complete shipped app-preview
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
-same `v0.4.0` release.
+same `v0.5.0` release.
 
 ## Flat mode
 
