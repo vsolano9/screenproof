@@ -6,6 +6,14 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## [0.5.1] - 2026-08-24
+
+### Changed
+
+- `homepage` now points at https://thechosenvictor.com/open-source, which
+  documents this package, rather than back at this README. No behaviour change.
+- Added a Maintainer section to the README.
+
 ## [0.5.0] - 2026-08-23
 
 Verified against Apple's screenshot and app-preview specification pages and
@@ -153,6 +161,7 @@ enforce, so no rule was added and the field was left off the public type.
 - CLI with locale and flat modes, `--json`, `--strict`, `--quiet`, `--no-color`,
   `--config`, and `--metadata`, plus a programmatic API and a GitHub Action.
 
+[0.5.1]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.3.0

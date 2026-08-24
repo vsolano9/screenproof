@@ -1,6 +1,6 @@
 {
   "name": "screenproof",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Lint App Store screenshots and app previews against Apple's published dimensions, format, duration, file-size, and count rules. Offline, zero dependencies.",
   "type": "module",
   "bin": {
@@ -50,7 +50,7 @@
   "bugs": {
     "url": "https://github.com/vsolano9/screenproof/issues"
   },
-  "homepage": "https://github.com/vsolano9/screenproof#readme",
+  "homepage": "https://thechosenvictor.com/open-source",
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"

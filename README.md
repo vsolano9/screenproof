@@ -163,7 +163,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.5.0
+- uses: vsolano9/screenproof@v0.5.1
   with:
     path: fastlane/screenshots
     strict: "true"
@@ -172,7 +172,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 
 The exact tag keeps CI reproducible and includes the complete shipped app-preview
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
-same `v0.5.0` release.
+same `v0.5.1` release.
 
 ## Flat mode
 
@@ -211,6 +211,10 @@ Release history, including which changes can flip a run's result, is in
 - [x] App preview checks: duration, per-device-size count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
 - [x] Fixture-backed app-preview H.264 profile/level, audio, and frame-rate checks. Bit rate and interlacing are [deliberately out of scope](#two-documented-requirements-screenproof-does-not-check); rotation carries no Apple requirement to enforce.
 - [x] `tRNS`-chunk PNG transparency detection.
+
+## Maintainer
+
+`screenproof` and its metadata sibling [metaproof](https://github.com/vsolano9/metaproof) are built and maintained by [Victor Solano](https://thechosenvictor.com/open-source), who runs them against twelve App Store apps before every submission.
 
 ## License
 
