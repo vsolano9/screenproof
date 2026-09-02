@@ -6,6 +6,21 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## [0.5.2] - 2026-09-02
+
+### Fixed
+
+- `screenshot-unknown-locale` no longer flags the 11 App Store locales Apple
+  and fastlane now accept: `bn-BD`, `gu-IN`, `kn-IN`, `ml-IN`, `mr-IN`,
+  `or-IN`, `pa-IN`, `sl-SI`, `ta-IN`, `te-IN`, `ur-PK`. A valid
+  `screenshots/ta-IN/` folder was reported as unknown. Apple's [App Store
+  localizations](https://developer.apple.com/help/app-store-connect/reference/app-information/app-store-localizations)
+  reference and the [App Store Connect API locale-shortcode table](https://developer.apple.com/documentation/appstoreconnectapi/managing-metadata-in-your-app-by-using-locale-shortcodes)
+  list 50 locales; fastlane `FastlaneCore::Languages::ALL_LANGUAGES` in
+  `fastlane_core/lib/fastlane_core/languages.rb` on `master` matches.
+  `KNOWN_LOCALES` now holds that table. Screenshots still have no `default/`
+  fallback.
+
 ## [0.5.1] - 2026-08-24
 
 ### Changed
@@ -161,6 +176,7 @@ enforce, so no rule was added and the field was left off the public type.
 - CLI with locale and flat modes, `--json`, `--strict`, `--quiet`, `--no-color`,
   `--config`, and `--metadata`, plus a programmatic API and a GitHub Action.
 
+[0.5.2]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.4.0

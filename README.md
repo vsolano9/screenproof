@@ -163,7 +163,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.5.1
+- uses: vsolano9/screenproof@v0.5.2
   with:
     path: fastlane/screenshots
     strict: "true"
@@ -172,7 +172,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 
 The exact tag keeps CI reproducible and includes the complete shipped app-preview
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
-same `v0.5.1` release.
+same `v0.5.2` release.
 
 ## Flat mode
 

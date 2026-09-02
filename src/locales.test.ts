@@ -11,6 +11,68 @@ test("common App Store locales are known", () => {
   }
 });
 
+test("isKnownLocale accepts every locale in Apple's App Store Connect API table", async (t) => {
+  const config = defaultConfig();
+  const appleAppStoreLocales = [
+    "ar-SA",
+    "bn-BD",
+    "ca",
+    "zh-Hans",
+    "zh-Hant",
+    "hr",
+    "cs",
+    "da",
+    "nl-NL",
+    "en-AU",
+    "en-CA",
+    "en-GB",
+    "en-US",
+    "fi",
+    "fr-FR",
+    "fr-CA",
+    "de-DE",
+    "el",
+    "gu-IN",
+    "he",
+    "hi",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "kn-IN",
+    "ko",
+    "ms",
+    "ml-IN",
+    "mr-IN",
+    "no",
+    "or-IN",
+    "pl",
+    "pt-BR",
+    "pt-PT",
+    "pa-IN",
+    "ro",
+    "ru",
+    "sk",
+    "sl-SI",
+    "es-MX",
+    "es-ES",
+    "sv",
+    "ta-IN",
+    "te-IN",
+    "th",
+    "tr",
+    "uk",
+    "ur-PK",
+    "vi",
+  ];
+  assert.equal(appleAppStoreLocales.length, 50);
+  for (const code of appleAppStoreLocales) {
+    await t.test(code, () => {
+      assert.equal(isKnownLocale(code, config), true, code);
+    });
+  }
+});
+
 test("default is NOT a known screenshots locale (deliver has no default/ fallback for screenshots)", () => {
   assert.equal(KNOWN_LOCALES.has("default"), false);
   assert.equal(isKnownLocale("default", defaultConfig()), false);

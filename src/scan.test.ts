@@ -1,13 +1,14 @@
 import { strict as assert } from "node:assert";
 import { chmod, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 
 import { defaultConfig } from "./config.ts";
 import { listMetadataLocales, scan } from "./scan.ts";
 import { makePng } from "./test-support/images.ts";
 import { makePreview } from "./test-support/previews.ts";
+import { validate } from "./validate.ts";
 
 async function tree(): Promise<string> {
   return mkdtemp(join(tmpdir(), "screenproof-scan-"));
@@ -55,6 +56,25 @@ test("a known locale subfolder triggers locale mode", async () => {
   assert.equal(result.locales[0]!.locale, "en-US");
   assert.equal(result.locales[0]!.isKnownLocale, true);
   assert.equal(result.locales[0]!.files[0]!.locale, "en-US");
+});
+
+test("Apple's newer App Store locale folders such as ta-IN scan as known", async () => {
+  const root = await tree();
+  await mkdir(join(root, "ta-IN"));
+  await writeFile(join(root, "ta-IN", "01.png"), PNG);
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.mode, "locale");
+  assert.equal(result.locales.length, 1);
+  assert.equal(result.locales[0]!.locale, "ta-IN");
+  assert.equal(result.locales[0]!.isKnownLocale, true);
+});
+
+test("the screenshots-new-locales fixture has no screenshot-unknown-locale finding", async () => {
+  const root = resolve(import.meta.dirname, "..", "fixtures", "screenshots-new-locales");
+  const scanned = await scan(root, defaultConfig());
+  const report = validate(scanned, defaultConfig());
+  assert.equal(scanned.locales.some((l) => l.locale === "ta-IN" && l.isKnownLocale), true);
+  assert.equal(report.findings.some((f) => f.rule === "screenshot-unknown-locale"), false);
 });
 
 test("forceFlat wins over locale detection", async () => {
