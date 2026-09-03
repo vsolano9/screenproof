@@ -1,0 +1,7 @@
+screenproof  /x/screenshots
+
+✖ en-US
+    error   01-iphone-6.9-display.png 500x500 does not match any known App Store screenshot size
+✖ error   -                        screenshots folder not found: /x
+
+Summary: 2 errors, 0 warnings, 0 info across 1 locale - FAIL

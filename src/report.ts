@@ -6,7 +6,8 @@
  * `NO_COLOR` or `--no-color`. JSON output is the same data the API returns.
  */
 
-import type { LintReport, Severity } from "./types.ts";
+import { paint as themePaint, type Role } from "./colors.generated.ts";
+import type { LintReport } from "./types.ts";
 
 export interface HumanOptions {
   /** Enable ANSI colour. Defaults to false. */
@@ -15,17 +16,9 @@ export interface HumanOptions {
   quiet?: boolean;
 }
 
-const COLORS: Record<Severity | "reset" | "dim" | "green", string> = {
-  error: "\u001b[31m",
-  warning: "\u001b[33m",
-  info: "\u001b[36m",
-  green: "\u001b[32m",
-  dim: "\u001b[2m",
-  reset: "\u001b[0m",
-};
-
-function paint(text: string, code: string, color: boolean): string {
-  return color ? `${code}${text}${COLORS.reset}` : text;
+function paint(text: string, role: Role, color: boolean): string {
+  if (!color) return text;
+  return themePaint(text, role);
 }
 
 /** Pretty JSON, matching the programmatic report shape. */
@@ -49,7 +42,7 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   const lines: string[] = [];
 
   const modeSuffix = report.mode === "flat" ? "  (flat mode)" : "";
-  lines.push(paint(`screenproof  ${report.root}${modeSuffix}`, COLORS.dim, color));
+  lines.push(paint(`screenproof  ${report.root}${modeSuffix}`, "muted", color));
   lines.push("");
 
   for (const locale of report.locales) {
@@ -60,15 +53,15 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
 
     const label = locale.locale === "" ? "." : locale.locale;
     if (locale.ok && visible.length === 0) {
-      lines.push(`${paint("✓", COLORS.green, color)} ${label}  ok`);
+      lines.push(`${paint("✓", "success", color)} ${label}  ok`);
       continue;
     }
 
-    const marker = locale.ok ? paint("✓", COLORS.green, color) : paint("✖", COLORS.error, color);
+    const marker = locale.ok ? paint("✓", "success", color) : paint("✖", "error", color);
     lines.push(`${marker} ${label}`);
     for (const finding of visible) {
       const fileLabel = finding.file ?? "-";
-      const sev = paint(finding.severity.padEnd(7), COLORS[finding.severity], color);
+      const sev = paint(finding.severity.padEnd(7), finding.severity, color);
       lines.push(`    ${sev} ${fileLabel.padEnd(24)} ${finding.message}`);
     }
   }
@@ -79,17 +72,17 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   const reportLevel =
     report.mode === "locale" ? report.findings.filter((f) => f.locale === "") : [];
   for (const finding of reportLevel) {
-    const sev = paint(finding.severity.padEnd(7), COLORS[finding.severity], color);
+    const sev = paint(finding.severity.padEnd(7), finding.severity, color);
     const glyph =
       finding.severity === "error"
-        ? paint("✖", COLORS.error, color)
-        : paint("!", COLORS[finding.severity], color);
+        ? paint("✖", "error", color)
+        : paint("!", finding.severity, color);
     const fileLabel = finding.file ?? "-";
     lines.push(`${glyph} ${sev} ${fileLabel.padEnd(24)} ${finding.message}`);
   }
 
   lines.push("");
-  const verdict = report.ok ? paint("PASS", COLORS.green, color) : paint("FAIL", COLORS.error, color);
+  const verdict = report.ok ? paint("PASS", "success", color) : paint("FAIL", "error", color);
   lines.push(
     `Summary: ${severityCounts(report)} across ${report.locales.length} locale${report.locales.length === 1 ? "" : "s"} - ${verdict}`,
   );

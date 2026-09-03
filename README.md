@@ -201,6 +201,10 @@ npm test       # node --test
 npm run build  # compile dist/
 ```
 
+## Design
+
+`DESIGN.md` at the repo root is the visual system; read it before UI, asset, or layout work. Gate: lint `DESIGN.md` to 0 errors. Theme files listed under `tcv.exports` are generated; edit DESIGN.md and re-export.
+
 ## Changelog
 
 Release history, including which changes can flip a run's result, is in

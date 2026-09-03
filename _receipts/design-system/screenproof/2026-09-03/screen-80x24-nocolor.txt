@@ -1,0 +1,8 @@
+screenproof  /x/screenshots
+
+✖ en-US
+    error   01-iphone-6.9-display.png 500x500 does not match any known App Store screenshot size
+✓ de-DE
+    warning 02.png                   PNG declares transparency; App Store Connect may reject it
+
+Summary: 1 error, 1 warning, 0 info across 2 locales - FAIL

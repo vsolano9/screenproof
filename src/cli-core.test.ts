@@ -216,3 +216,45 @@ test("help and version exit 0", async () => {
   assert.equal(await run(["--version"], io2), 0);
   assert.match(io2.stdout.join(""), /^\d+\.\d+\.\d+\n$/);
 });
+
+test("run --no-color on a TTY emits no ANSI", async () => {
+  const cwd = await localeTree({ "en-US/01.png": BAD_PNG });
+  const io = fakeIo(cwd);
+  io.isTTY = true;
+  const code = await run(["--no-color"], io);
+  assert.equal(code, 1);
+  const out = io.stdout.join("");
+  assert.equal(out.includes("\u001b["), false);
+  assert.match(out, /FAIL/);
+  assert.match(out, /error/);
+});
+
+test("run honors NO_COLOR on a TTY", async () => {
+  const cwd = await localeTree({ "en-US/01.png": BAD_PNG });
+  const io = fakeIo(cwd);
+  io.isTTY = true;
+  io.env = { NO_COLOR: "1" };
+  const code = await run([], io);
+  assert.equal(code, 1);
+  const out = io.stdout.join("");
+  assert.equal(out.includes("\u001b["), false);
+  assert.match(out, /FAIL/);
+});
+
+test("run on a TTY without NO_COLOR emits theme ANSI", async () => {
+  const cwd = await localeTree({ "en-US/01.png": BAD_PNG });
+  const io = fakeIo(cwd);
+  io.isTTY = true;
+  const prev = process.env.NO_COLOR;
+  delete process.env.NO_COLOR;
+  try {
+    const code = await run([], io);
+    assert.equal(code, 1);
+    const out = io.stdout.join("");
+    assert.match(out, /\u001b\[31m/);
+    assert.match(out, /FAIL/);
+  } finally {
+    if (prev === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = prev;
+  }
+});
