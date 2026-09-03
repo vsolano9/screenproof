@@ -174,6 +174,29 @@ The exact tag keeps CI reproducible and includes the complete shipped app-previe
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
 same `v0.5.2` release.
 
+## Programmatic API
+
+There is no single `lint()` wrapper. The CLI scans, then validates:
+
+```ts
+import {
+  defaultConfig,
+  scan,
+  validate,
+  renderHuman,
+  exitCode,
+} from "screenproof";
+
+const config = defaultConfig();
+const scanned = await scan("fastlane/screenshots", config);
+const report = validate(scanned, config);
+console.log(renderHuman(report));
+process.exit(exitCode(report, false));
+```
+
+`scan(root, config, { forceFlat?: boolean })` walks a deliver tree or a flat folder. `validate(scan, config, { metadataLocales? })` applies the rule table. `defaultConfig()`, `mergeConfig()`, and `loadConfig()` build config. `renderHuman()`, `renderJson()`, and `exitCode()` format and gate. Header parsers (`parseImageHeader`, `parsePreviewFile`) and the dimension tables are also exported for tools that already have the bytes.
+
+
 ## Flat mode
 
 Point screenproof at any folder of images (no fastlane required):
