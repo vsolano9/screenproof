@@ -49,6 +49,7 @@ credentials.json
 .claude.json
 .codex/
 .cursor/
+.omp/
 .aider*
 .continue/
 .windsurf/
