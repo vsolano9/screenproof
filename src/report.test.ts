@@ -116,3 +116,36 @@ test("report-level warnings render the warning marker and file name, not the err
   assert.match(line, /stray\.txt/);
   assert.match(text, /PASS/);
 });
+
+test("color output uses theme ANSI and strips under NO_COLOR", () => {
+  const r = report([ERROR]);
+  const prev = process.env.NO_COLOR;
+  delete process.env.NO_COLOR;
+  try {
+    const colored = renderHuman(r, { color: true });
+    assert.match(colored, /\u001b\[31m/);
+    assert.match(colored, /\u001b\[0m/);
+    assert.match(colored, /FAIL/);
+    process.env.NO_COLOR = "1";
+    const stripped = renderHuman(r, { color: true });
+    assert.equal(stripped.includes("\u001b["), false);
+    assert.match(stripped, /FAIL/);
+    assert.match(stripped, /error/);
+    assert.match(stripped, /✖/);
+  } finally {
+    if (prev === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = prev;
+  }
+});
+
+test("color:false never emits ANSI even when NO_COLOR is unset", () => {
+  const prev = process.env.NO_COLOR;
+  delete process.env.NO_COLOR;
+  try {
+    const text = renderHuman(report([ERROR]));
+    assert.equal(text.includes("\u001b["), false);
+  } finally {
+    if (prev === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = prev;
+  }
+});
