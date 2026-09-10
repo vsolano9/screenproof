@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "fixtures": "node scripts/generate-fixtures.mjs",
+    "generate-og": "node scripts/generate-og.mjs",
     "build": "npm run fixtures && tsc --noEmit && vite build",
     "dev": "npm run fixtures && vite",
     "preview": "vite preview"
