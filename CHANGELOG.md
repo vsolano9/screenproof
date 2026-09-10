@@ -6,6 +6,23 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## [0.6.0] - 2026-09-10
+
+### Added
+
+- Browser-safe `screenproof/browser` entry with the same PNG/JPEG/ISO media
+  parsers, locale rules, severities, and Apple-style finding messages as the
+  CLI, without importing Node filesystem APIs.
+- Browser-only fixture inspector at https://screenproof.vercel.app with file
+  and folder drag/drop, three generated synthetic fixtures, and a direct
+  pass/fail rule matrix. User media stays in memory and is never uploaded.
+
+### Changed
+
+- Split the Node-only preview file reader from the pure ISO base-media parser
+  so MOV, M4V, and MP4 bytes can be inspected in browsers without changing CLI
+  behavior.
+
 ## [0.5.2] - 2026-09-02
 
 ### Fixed
@@ -176,6 +193,7 @@ enforce, so no rule was added and the field was left off the public type.
 - CLI with locale and flat modes, `--json`, `--strict`, `--quiet`, `--no-color`,
   `--config`, and `--metadata`, plus a programmatic API and a GitHub Action.
 
+[0.6.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.6.0
 [0.5.2]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vsolano9/screenproof/releases/tag/v0.5.0

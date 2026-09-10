@@ -11,50 +11,12 @@
 
 import { readFile } from "node:fs/promises";
 
+import { defaultConfig, DEFAULT_RULES } from "./rules.ts";
 import type { Config, DimensionOverrides, RuleLevel } from "./types.ts";
 
-const RULE_LEVELS: ReadonlySet<string> = new Set(["error", "warning", "info", "off"]);
+export { defaultConfig, DEFAULT_RULES } from "./rules.ts";
 
-/** Default rule severities. Keys are stable rule ids used across the linter. */
-export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
-  "missing-screenshots": "error",
-  "screenshot-unreadable": "error",
-  "screenshot-unknown-dimensions": "error",
-  "screenshot-count-over": "error",
-  "screenshot-format": "error",
-  "screenshot-png-alpha": "warning",
-  "screenshot-unexpected-file": "warning",
-  "screenshot-unknown-locale": "warning",
-  "screenshot-locale-empty": "warning",
-  "screenshot-primary-size-missing": "off",
-  "screenshot-locale-parity": "off",
-  "screenshot-watch-size-consistency": "error",
-  "preview-format": "error",
-  "preview-codec": "error",
-  "preview-file-size": "error",
-  "preview-duration": "error",
-  "preview-resolution": "error",
-  "preview-count-over": "error",
-  "preview-frame-rate": "error",
-  "preview-h264-profile": "error",
-  "preview-audio-missing": "error",
-  "preview-audio-layout": "error",
-  "preview-audio-codec": "error",
-  "preview-audio-sample-rate": "error",
-  "preview-audio-bit-depth": "error",
-  // Apple writes "all tracks should be enabled", not "must".
-  "preview-track-disabled": "warning",
-};
-
-/** A fresh default configuration. */
-export function defaultConfig(): Config {
-  return {
-    rules: { ...DEFAULT_RULES },
-    locales: { allow: null, extra: [], ignore: [] },
-    dimensions: {},
-  };
-}
-
+const RULE_LEVELS: readonly string[] = ["error", "warning", "info", "off"];
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -112,7 +74,7 @@ export function mergeConfig(base: Config, input: unknown): Config {
       if (!(key in DEFAULT_RULES)) {
         throw new Error(`config.rules.${key} is not a known rule id`);
       }
-      if (typeof value !== "string" || !RULE_LEVELS.has(value)) {
+      if (typeof value !== "string" || !RULE_LEVELS.includes(value)) {
         throw new Error(`config.rules.${key} must be one of error, warning, info, off`);
       }
       merged.rules[key] = value as RuleLevel;

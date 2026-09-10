@@ -1,0 +1,6 @@
+Generated 2026-09-10 with xd://generate_image at 1536x1024.
+Reference 1: mobile/tide-guide-ipad-01.jpg — interface hierarchy.
+Reference 2: brand/insight-films-system.jpg — material.
+Decision: KEEP the asymmetric input/result split, crop-mark fixture frame, direct matrix, square geometry, and dark ink depth.
+Change in implementation: remove decorative fake PASS rows, show only enabled-rule outcomes derived from the shared validator, and keep the real local-only note adjacent to file controls.
+Reject: generated iconography and any rendering of user screenshots as promotional decoration.

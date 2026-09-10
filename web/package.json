@@ -1,0 +1,16 @@
+{
+  "name": "screenproof-web",
+  "private": true,
+  "version": "0.6.0",
+  "type": "module",
+  "scripts": {
+    "fixtures": "node scripts/generate-fixtures.mjs",
+    "build": "npm run fixtures && tsc --noEmit && vite build",
+    "dev": "npm run fixtures && vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vite": "^7.1.0"
+  }
+}

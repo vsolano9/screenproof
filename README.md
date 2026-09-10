@@ -14,6 +14,23 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
 - Zero-dependency ISO base-media and QuickTime atom parsing that skips encoded media payloads.
 
+## Browser fixture inspector
+
+Open **[screenproof.vercel.app](https://screenproof.vercel.app)** to inspect files
+or a fastlane locale folder without installing anything. User files never leave
+the browser. The bundled examples are synthetic, including this deliberate
+failure:
+
+```text
+FAIL  screenshot-unknown-dimensions
+1170x2500 does not match any known App Store screenshot size;
+closest is 1170x2532 (iPhone 6.1-inch, portrait)
+```
+
+Choose **Wrong size** to reproduce it, or drop your own PNG, JPEG, MOV, M4V, or
+MP4. The inspector runs the package's shared parsers and validation rules; it
+does not upload, persist, or log user media.
+
 ## Requirements
 
 Node.js 24 or newer, and zero runtime dependencies. The published package ships compiled JavaScript, so `npx screenproof` and `npm install` just work with no build step on your side.
@@ -163,7 +180,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.5.2
+- uses: vsolano9/screenproof@v0.6.0
   with:
     path: fastlane/screenshots
     strict: "true"
@@ -172,7 +189,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 
 The exact tag keeps CI reproducible and includes the complete shipped app-preview
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
-same `v0.5.2` release.
+same `v0.6.0` release.
 
 ## Programmatic API
 
@@ -195,6 +212,19 @@ process.exit(exitCode(report, false));
 ```
 
 `scan(root, config, { forceFlat?: boolean })` walks a deliver tree or a flat folder. `validate(scan, config, { metadataLocales? })` applies the rule table. `defaultConfig()`, `mergeConfig()`, and `loadConfig()` build config. `renderHuman()`, `renderJson()`, and `exitCode()` format and gate. Header parsers (`parseImageHeader`, `parsePreviewFile`) and the dimension tables are also exported for tools that already have the bytes.
+
+Browser tools can import the side-effect-free entry without pulling in Node
+filesystem modules:
+
+```ts
+import { inspectBrowserFixtures } from "screenproof/browser";
+
+const bytes = new Uint8Array(await file.arrayBuffer());
+const report = inspectBrowserFixtures([{ name: file.name, bytes }]);
+```
+
+`inspectBrowserFixtures` performs no I/O. Callers choose how bytes enter memory;
+the hosted inspector reads browser `File` objects locally.
 
 
 ## Flat mode
@@ -226,7 +256,7 @@ npm run build  # compile dist/
 
 ## Design
 
-`DESIGN.md` at the repo root is the visual system; read it before UI, asset, or layout work. Gate: lint `DESIGN.md` to 0 errors. Theme files listed under `tcv.exports` are generated; edit DESIGN.md and re-export.
+`DESIGN.md` at the repo root owns the CLI visual system; `web/DESIGN.md` owns the browser inspector. Gate each contract to 0 lint errors. Theme files listed under `tcv.exports` are generated; edit the owning DESIGN.md and re-export.
 
 ## Changelog
 

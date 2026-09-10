@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { parsePreviewFile, parsePreviewHeader } from "./previewheader.ts";
+import { parsePreviewFile } from "./previewfile.ts";
+import { parsePreviewHeader } from "./previewheader.ts";
 import { makePreview, makePreviewFile } from "./test-support/previews.ts";
 
 /** Parse a built fixture and return its info, failing loudly if it did not parse. */

@@ -12,30 +12,14 @@
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 
 import { parseImageHeader } from "./imageheader.ts";
-import { parsePreviewFile } from "./previewheader.ts";
+import { fileExtension, IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS, VIDEO_EXTENSIONS } from "./media.ts";
+import { parsePreviewFile } from "./previewfile.ts";
 import { isKnownLocale, NON_LOCALE_FOLDERS } from "./locales.ts";
 import type { Config, Finding, LocaleScan, PreviewFile, ScanResult, ScreenshotFile } from "./types.ts";
 
-export const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([".png", ".jpg", ".jpeg"]);
-export const PREVIEW_EXTENSIONS: ReadonlySet<string> = new Set([".mov", ".m4v", ".mp4"]);
-const VIDEO_EXTENSIONS: ReadonlySet<string> = new Set([
-  ...PREVIEW_EXTENSIONS,
-  ".3gp",
-  ".avi",
-  ".flv",
-  ".mkv",
-  ".m2ts",
-  ".mpeg",
-  ".mpg",
-  ".mts",
-  ".ogv",
-  ".ts",
-  ".webm",
-  ".wmv",
-]);
 
 export interface ScanOptions {
   /** Treat the root as a flat folder of media even if locale folders exist. */
@@ -47,11 +31,11 @@ function isHidden(name: string): boolean {
 }
 
 function isImageFile(name: string): boolean {
-  return IMAGE_EXTENSIONS.has(extname(name).toLowerCase());
+  return IMAGE_EXTENSIONS.has(fileExtension(name));
 }
 
 function isPreviewFile(name: string): boolean {
-  return VIDEO_EXTENSIONS.has(extname(name).toLowerCase());
+  return VIDEO_EXTENSIONS.has(fileExtension(name));
 }
 
 interface DirEntry {
@@ -97,7 +81,7 @@ async function scanImage(dir: string, name: string, locale: string): Promise<Scr
 
 async function scanPreview(dir: string, name: string, locale: string): Promise<PreviewFile> {
   const path = join(dir, name);
-  const extensionSupported = PREVIEW_EXTENSIONS.has(extname(name).toLowerCase());
+  const extensionSupported = PREVIEW_EXTENSIONS.has(fileExtension(name));
   let sizeBytes = 0;
   try {
     sizeBytes = (await stat(path)).size;
@@ -119,7 +103,7 @@ async function scanPreview(dir: string, name: string, locale: string): Promise<P
     extensionSupported,
     parse: extensionSupported
       ? await parsePreviewFile(path)
-      : { ok: false, reason: `unsupported app-preview extension ${extname(name).toLowerCase()}` },
+      : { ok: false, reason: `unsupported app-preview extension ${fileExtension(name)}` },
   };
 }
 

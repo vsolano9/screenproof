@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src", "../src/browser.ts", "../src/dimensions.ts", "../src/imageheader.ts", "../src/locales.ts", "../src/media.ts", "../src/previewdimensions.ts", "../src/previewheader.ts", "../src/rules.ts", "../src/types.ts", "../src/validate.ts"]
+}

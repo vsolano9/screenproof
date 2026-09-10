@@ -1,13 +1,14 @@
 {
   "name": "screenproof",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Lint App Store screenshots and app previews against Apple's published dimensions, format, duration, file-size, and count rules. Offline, zero dependencies.",
   "type": "module",
   "bin": {
     "screenproof": "dist/cli.js"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./browser": "./dist/browser.js"
   },
   "engines": {
     "node": ">=24.0.0"

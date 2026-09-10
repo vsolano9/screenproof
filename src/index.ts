@@ -14,7 +14,10 @@ export {
   VERIFIED_ON,
 } from "./dimensions.ts";
 export { parseImageHeader } from "./imageheader.ts";
-export { parsePreviewFile, parsePreviewHeader } from "./previewheader.ts";
+export { inspectBrowserFixtures } from "./browser.ts";
+export type { BrowserFixtureInput } from "./browser.ts";
+export { parsePreviewFile } from "./previewfile.ts";
+export { parsePreviewHeader } from "./previewheader.ts";
 export {
   classifyPreviewSize,
   isAcceptedPreviewSize,
@@ -25,8 +28,9 @@ export {
 } from "./previewdimensions.ts";
 export type { PreviewSizeClass } from "./previewdimensions.ts";
 export { isKnownLocale, KNOWN_LOCALES, NON_LOCALE_FOLDERS } from "./locales.ts";
+export { IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS } from "./media.ts";
 export { exitCode, renderHuman, renderJson } from "./report.ts";
-export { IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS, listMetadataLocales, scan } from "./scan.ts";
+export { listMetadataLocales, scan } from "./scan.ts";
 export { validate } from "./validate.ts";
 export type {
   AvcConfig,

@@ -6,11 +6,10 @@
  * root) pass through here so config levels apply uniformly.
  */
 
-import { extname } from "node:path";
-
-import { DEFAULT_RULES } from "./config.ts";
 import { applyDimensionOverrides, classify, DEFAULT_CLASSES, nearestValidSize } from "./dimensions.ts";
+import { fileExtension } from "./media.ts";
 import { classifyPreviewSize } from "./previewdimensions.ts";
+import { DEFAULT_RULES } from "./rules.ts";
 import type {
   Config,
   Finding,
@@ -154,7 +153,7 @@ function previewCodecProblem(name: string, codecFourCC: string | null): string |
   if (codecFourCC === null) {
     return "app preview has no video codec sample entry";
   }
-  const extension = extname(name).toLowerCase();
+  const extension = fileExtension(name);
   if (codecFourCC === "avc1" || codecFourCC === "avc3") return null;
   if (codecFourCC === "apch") {
     return extension === ".mov"
