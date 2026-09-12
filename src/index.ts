@@ -38,6 +38,7 @@ export type {
   DeviceClass,
   DimensionOverrides,
   Finding,
+  GateStatus,
   ImageInfo,
   LintReport,
   LocaleReport,
@@ -55,4 +56,5 @@ export type {
   ScreenshotFile,
   Severity,
   Size,
+  UnverifiedCheck,
 } from "./types.ts";

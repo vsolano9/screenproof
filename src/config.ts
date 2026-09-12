@@ -71,7 +71,7 @@ export function mergeConfig(base: Config, input: unknown): Config {
   if ("rules" in input) {
     if (!isPlainObject(input.rules)) throw new Error("config.rules must be an object");
     for (const [key, value] of Object.entries(input.rules)) {
-      if (!(key in DEFAULT_RULES)) {
+      if (!Object.hasOwn(DEFAULT_RULES, key)) {
         throw new Error(`config.rules.${key} is not a known rule id`);
       }
       if (typeof value !== "string" || !RULE_LEVELS.includes(value)) {

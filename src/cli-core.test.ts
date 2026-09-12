@@ -124,28 +124,51 @@ test("run exits 1 on errors and prints them", async () => {
   assert.match(io.stdout.join(""), /does not match any known App Store screenshot size/);
 });
 
-test("run --json prints a parseable report", async () => {
+test("run --json includes the explicit gate status", async () => {
   const cwd = await localeTree({ "en-US/01.png": PNG });
   const io = fakeIo(cwd);
   const code = await run(["--json"], io);
   assert.equal(code, 0);
-  const parsed = JSON.parse(io.stdout.join("")) as { ok: boolean; mode: string };
+  const parsed = JSON.parse(io.stdout.join("")) as { ok: boolean; gate: string; mode: string };
   assert.equal(parsed.ok, true);
+  assert.equal(parsed.gate, "pass");
   assert.equal(parsed.mode, "locale");
 });
 
-test("run --strict fails on warnings", async () => {
-  const cwd = await localeTree({ "en-US/01.png": ALPHA_PNG });
-  const io = fakeIo(cwd);
-  assert.equal(await run([], io), 0);
-  assert.equal(await run(["--strict"], io), 1);
+test("run --strict prints and serializes the effective warning gate", async () => {
+  const cwd = await localeTree({ "en_US/01.png": PNG });
+  const normalIo = fakeIo(cwd);
+  assert.equal(await run([], normalIo), 0);
+  assert.match(normalIo.stdout.join(""), /PASS WITH WARNINGS/);
+
+  const strictIo = fakeIo(cwd);
+  assert.equal(await run(["--strict"], strictIo), 1);
+  assert.match(strictIo.stdout.join(""), /FAIL/);
+  assert.equal(strictIo.stdout.join("").includes("PASS"), false);
+
+  const jsonIo = fakeIo(cwd);
+  assert.equal(await run(["--strict", "--json"], jsonIo), 1);
+  const parsed = JSON.parse(jsonIo.stdout.join("")) as { ok: boolean; gate: string };
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.gate, "fail");
 });
 
 test("run detects tRNS transparency end to end", async () => {
   const cwd = await localeTree({ "en-US/01.png": TRNS_PNG });
   const io = fakeIo(cwd);
   assert.equal(await run(["--strict"], io), 1);
-  assert.match(io.stdout.join(""), /PNG declares transparency/);
+  assert.match(io.stdout.join(""), /PNG alpha channels and transparency are not allowed/);
+});
+
+test("run --quiet hides report-level info while preserving summary counts", async () => {
+  const cwd = await localeTree({ "en-US/01.png": PNG, "stray.txt": new TextEncoder().encode("note") });
+  const config = join(cwd, "screenproof.json");
+  await writeFile(config, JSON.stringify({ rules: { "screenshot-unexpected-file": "info" } }));
+  const io = fakeIo(cwd);
+  assert.equal(await run(["--quiet", "--config", config], io), 0);
+  const output = io.stdout.join("");
+  assert.equal(output.includes("stray.txt"), false);
+  assert.match(output, /1 info/);
 });
 
 test("run reports a missing root as an error exit", async () => {
