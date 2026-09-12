@@ -34,10 +34,11 @@ function descriptor(tag: number, payload: Uint8Array): Uint8Array {
   return concat([new Uint8Array([tag, payload.length]), payload]);
 }
 
-function elementaryStreamDescriptor(objectTypeIndication: number): Uint8Array {
+function elementaryStreamDescriptor(objectTypeIndication: number, config: Uint8Array | null): Uint8Array {
   const decoderConfig = descriptor(0x04, concat([
     new Uint8Array([objectTypeIndication, 0x15]),
     new Uint8Array(11),
+    ...(config === null ? [] : [descriptor(0x05, config)]),
   ]));
   const es = descriptor(0x03, concat([
     u16(1),
@@ -137,7 +138,7 @@ function audioSampleEntry(track: AudioTrackSpec): Uint8Array {
   }
   const objectType = track.objectTypeIndication === undefined ? 0x40 : track.objectTypeIndication;
   const extensions = codecFourCC === "mp4a" && objectType !== null
-    ? elementaryStreamDescriptor(objectType)
+    ? elementaryStreamDescriptor(objectType, track.audioSpecificConfig === undefined ? new Uint8Array([0x12, 0x10]) : track.audioSpecificConfig)
     : new Uint8Array(0);
   return box(codecFourCC, concat([fixed, extensions]));
 }
@@ -162,6 +163,8 @@ export interface AudioTrackSpec {
   soundDescriptionVersion?: 0 | 1 | 2;
   /** MPEG-4 DecoderConfigDescriptor object type; null omits `esds`. */
   objectTypeIndication?: number | null;
+  /** DecoderSpecificInfo; null omits it, undefined writes AAC-LC stereo. */
+  audioSpecificConfig?: Uint8Array | null;
   /** Version-2 Core Audio format flags. */
   formatSpecificFlags?: number;
 }

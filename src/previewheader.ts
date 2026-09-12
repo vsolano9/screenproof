@@ -20,6 +20,7 @@
  */
 
 
+import { mpeg4AudioCodec } from "./audio-config.ts";
 import type { AvcConfig, PreviewAudioCodec, PreviewAudioTrack, PreviewParseResult } from "./types.ts";
 
 
@@ -36,7 +37,6 @@ interface Descriptor {
 }
 
 const AUDIO_CODEC_BY_OBJECT_TYPE: Readonly<Record<number, PreviewAudioCodec>> = {
-  0x40: "aac",
   0x66: "aac",
   0x67: "aac",
   0x68: "aac",
@@ -193,11 +193,11 @@ function descriptorAt(bytes: Uint8Array, offset: number, end: number): Descripto
   return { tag, dataStart: cursor, end: descriptorEnd };
 }
 
-function decoderObjectType(bytes: Uint8Array, esds: Atom): number | null {
+function decoderConfigDescriptor(bytes: Uint8Array, esds: Atom): Descriptor | null {
   if (esds.dataStart + 4 >= esds.end) return null;
   const top = descriptorAt(bytes, esds.dataStart + 4, esds.end);
   if (top.tag === 0x04) {
-    return top.dataStart < top.end ? bytes[top.dataStart]! : null;
+    return top;
   }
   if (top.tag !== 0x03 || top.dataStart + 3 > top.end) return null;
 
@@ -214,7 +214,7 @@ function decoderObjectType(bytes: Uint8Array, esds: Atom): number | null {
   while (cursor < top.end) {
     const nested = descriptorAt(bytes, cursor, top.end);
     if (nested.tag === 0x04) {
-      return nested.dataStart < nested.end ? bytes[nested.dataStart]! : null;
+      return nested;
     }
     cursor = nested.end;
   }
@@ -261,8 +261,22 @@ function audioCodec(
     if (wave) esds = atoms(bytes, wave.dataStart, wave.end).find((box) => box.type === "esds");
   }
   if (!esds) return "unknown";
-  const objectType = decoderObjectType(bytes, esds);
-  return objectType === null ? "unknown" : (AUDIO_CODEC_BY_OBJECT_TYPE[objectType] ?? "unknown");
+  const decoder = decoderConfigDescriptor(bytes, esds);
+  if (!decoder || decoder.end - decoder.dataStart < 13) return "unknown";
+  if ((bytes[decoder.dataStart + 1]! >>> 2) !== 5) return "unknown";
+  const objectType = bytes[decoder.dataStart]!;
+  if (objectType !== 0x40) return AUDIO_CODEC_BY_OBJECT_TYPE[objectType] ?? "unknown";
+  let specific: Descriptor | undefined;
+  let cursor = decoder.dataStart + 13;
+  while (cursor < decoder.end) {
+    const descriptor = descriptorAt(bytes, cursor, decoder.end);
+    if (descriptor.tag === 0x05) {
+      if (specific) return "unknown";
+      specific = descriptor;
+    }
+    cursor = descriptor.end;
+  }
+  return specific ? mpeg4AudioCodec(bytes.subarray(specific.dataStart, specific.end)) : "unknown";
 }
 
 /** `track_enabled` is bit 0 of the `tkhd` flags, the low 24 bits of the full-box header. */
@@ -375,7 +389,7 @@ function audioTrackInfo(bytes: Uint8Array, trak: Atom): PreviewAudioTrack | null
       codecFourCC: entry.type,
       codec,
       channelCount: view.getUint32(8),
-      sampleRateHz: Math.round(view.getFloat64(0)),
+      sampleRateHz: view.getFloat64(0),
       bitDepth: codec === "pcm" && bitDepth > 0 ? bitDepth : null,
       pcmFormatFlags: view.getUint32(20),
       enabled,
@@ -398,7 +412,7 @@ function audioTrackInfo(bytes: Uint8Array, trak: Atom): PreviewAudioTrack | null
     codec,
     channelCount: u16(bytes, entry.dataStart + 16),
     bitDepth: codec === "pcm" && declaredBitDepth > 0 ? declaredBitDepth : null,
-    sampleRateHz: u16(bytes, entry.dataStart + 24),
+    sampleRateHz: u32(bytes, entry.dataStart + 24) / 65_536,
     enabled,
   };
 }

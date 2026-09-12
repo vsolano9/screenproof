@@ -38,7 +38,7 @@ try {
       target: "ES2023",
       module: "NodeNext",
       moduleResolution: "NodeNext",
-      skipLibCheck: true,
+      skipLibCheck: false,
       outDir: "compiled",
     },
     include: ["use.mts"],

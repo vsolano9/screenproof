@@ -91,6 +91,9 @@ function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
     return { ok: false, reason: `corrupt PNG: invalid bit depth ${bitDepth} for color type ${colorType}` };
   }
 
+  if (buf[26] !== 0) return { ok: false, reason: "invalid PNG compression method" };
+  if (buf[27] !== 0) return { ok: false, reason: "invalid PNG filter method" };
+  if (buf[28] !== 0 && buf[28] !== 1) return { ok: false, reason: "invalid PNG interlace method" };
   let hasAlpha = colorType === 4 || colorType === 6;
   let offset = 33;
   while (!hasAlpha) {
@@ -178,6 +181,24 @@ function parseJpeg(buf: Uint8Array, sizeBytes: number): ParseResult {
       }
       if (segmentLength !== 8 + componentCount * 3) {
         return { ok: false, reason: "invalid JPEG frame header: incomplete component table" };
+      }
+      const precision = buf[j + 3]!;
+      if (precision !== 8 && !(marker !== 0xc0 && precision === 12)) {
+        return { ok: false, reason: `invalid JPEG precision ${precision} for SOF${marker - 0xc0}` };
+      }
+      const componentIds = new Set<number>();
+      for (let component = 0; component < componentCount; component++) {
+        const offset = j + 9 + component * 3;
+        const id = buf[offset]!;
+        const sampling = buf[offset + 1]!;
+        const horizontal = sampling >>> 4;
+        const vertical = sampling & 0x0f;
+        if (componentIds.has(id)) return { ok: false, reason: "invalid JPEG: duplicate component identifier" };
+        componentIds.add(id);
+        if (horizontal < 1 || horizontal > 4 || vertical < 1 || vertical > 4) {
+          return { ok: false, reason: "invalid JPEG component sampling factors" };
+        }
+        if (buf[offset + 2]! > 3) return { ok: false, reason: "invalid JPEG quantization-table selector" };
       }
       const height = readU16BE(buf, j + 4);
       const width = readU16BE(buf, j + 6);

@@ -54,6 +54,17 @@ called out below.
 
 ### Fixed
 
+- Release-review regressions RR-01 through RR-05: MPEG-4 AudioSpecificConfig
+  distinguishes AAC from MPEG Layer 3/CELP and missing declarations; invalid
+  sample rates fail without rounding or silently skipping the check.
+- Duplicate browser paths preserve every selected input and fail with an
+  explicit recovery instruction instead of allowing last-file-wins results.
+- PNG compression/filter/interlace fields and JPEG precision, component IDs,
+  sampling factors, and quantization selectors receive structural checks.
+- The packaged TypeScript consumer checks all declarations with
+  `skipLibCheck: false`. The additive `inspectBrowserSelection` browser API
+  exposes the actual scan alongside the report for accurate asset-level UI.
+
 - CLI and browser scans now share flat/locale detection, hidden-directory
   handling, nonrecursive locale scans, and missing-media diagnostics. Browser
   folder selection strips exactly the chosen root.

@@ -116,12 +116,15 @@ out-of-scope properties conform. The JSON report names every measurement the
 available metadata could not establish in `unverifiedChecks`, separately from
 findings. Most of those measurements are skipped; an unidentifiable audio
 codec also fails `preview-audio-codec`, because it is not evidence of AAC.
+Missing, nonfinite, or nonpositive audio sample rates fail
+`preview-audio-sample-rate` and are disclosed as unverified; fractional rates
+are checked without rounding.
 
 | Status | Requirements | Behavior |
 | --- | --- | --- |
 | Checked | Exact screenshot/preview dimensions; PNG/JPEG headers and declared PNG transparency; per-size counts; Watch-size consistency; preview container, video and audio codec, file size, duration, resolution, audio layout/sample rate, and track-enabled flags | Enforced by the rules above and covered by fixture-backed tests. |
 | Checked when present | Preview frame rate (`stts`), H.264 profile/level (`avcC`), and PCM bit depth (QuickTime sound description) | Enforced when the required container metadata exists; otherwise named in `unverifiedChecks` and not judged. |
-| Checked conservatively | MPEG-4 audio object type (`esds`) | An `mp4a` entry with no identifiable object type fails `preview-audio-codec` and is also named in `unverifiedChecks`. |
+| Checked conservatively | MPEG-4 audio identity (`esds` and `AudioSpecificConfig`) | Object type `0x40` alone is not evidence of AAC. MPEG Layer 3 and other non-AAC declarations fail. Missing or unsupported configurations fail conservatively; malformed descriptors fail parsing. |
 | Not verifiable from a partial folder | Whether every remote App Store slot has an asset, and whether the same-resolution file belongs to every possible mixed-platform slot | Counts use Apple's resolution groups. A local folder proves only what it contains. |
 | Out of scope | EXIF orientation transforms, rotation matrices, progressive/interlaced decoding, AAC 256 kbps and target video bitrate, and full image/video decoding | Reported here rather than guessed from file size or incomplete metadata. |
 
@@ -168,7 +171,7 @@ in the same change; tests intentionally do not make network requests.
 
 Apple requires one Apple Watch screenshot size to be used consistently across all localizations for an app. `screenshot-watch-size-consistency` enforces that requirement using the exact pixel sizes above; localizations without Watch screenshots are ignored.
 
-Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` is the 13-inch iPad (add `IPAD_PRO_129`-style keywords for 2nd gen), and keywordless `3840x2160` is Apple TV (name the file `vision-...` for Vision Pro).
+Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` is the 13-inch iPad (use `app_ipad_pro_129-01.png` or a name containing both `12.9` and `2nd generation` for the legacy slot), and keywordless `3840x2160` is Apple TV (name the file `vision-...` for Vision Pro).
 
 ## Accepted app-preview sizes
 
@@ -283,6 +286,9 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 `--metadata` cannot be combined with explicit `--flat`. If screenproof auto-detects a flat folder while `--metadata` is present, it still runs the file-level checks and skips the locale comparison.
 
 ## Known limitations
+
+- MPEG-4 AAC identity recognizes Main, LC, SSR, LTP, and explicit HE-AAC wrappers with a recognized AAC core. Program-config-element layouts and other unimplemented audio object types fail conservatively; this is not a complete audio bitstream decoder.
+- Browser selections with duplicate normalized paths fail explicitly. Every input is retained and inspected when in scan scope; choose their parent folder to preserve distinct paths or rename the files.
 
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
 - JPEG validation covers bounded baseline, extended-sequential, and progressive frame headers (SOF0/1/2). It validates framing, component/table declarations, and marker bounds, but does not decode entropy-coded image data.

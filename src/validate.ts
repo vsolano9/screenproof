@@ -132,7 +132,7 @@ function audioProblems(
       problems.push({ rule: "preview-audio-codec", message });
     }
 
-    if (track.sampleRateHz > 0 && !AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
+    if (!AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
       problems.push({
         rule: "preview-audio-sample-rate",
         message: `audio sample rate ${track.sampleRateHz} Hz is not 44100 or 48000 Hz`,
@@ -331,6 +331,12 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         });
       }
       for (const track of audioTracks) {
+        if (!Number.isFinite(track.sampleRateHz) || track.sampleRateHz <= 0) {
+          unverifiedChecks.push({
+            locale: locale.locale, file: file.name, check: "preview-audio-sample-rate",
+            reason: "audio sample rate is missing or invalid; the sample-rate rule fails conservatively",
+          });
+        }
         if (track.codec === "unknown") {
           unverifiedChecks.push({
             locale: locale.locale,

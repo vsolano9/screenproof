@@ -153,8 +153,8 @@ export interface Finding {
 
 /**
  * A measurement the file's metadata did not support. Most such checks are
- * simply skipped; `preview-audio-codec` additionally fails conservatively,
- * because an unidentifiable codec is not evidence of AAC.
+ * simply skipped. Unidentifiable audio codecs and invalid or missing sample
+ * rates additionally fail their rules conservatively rather than imply compliance.
  */
 export interface UnverifiedCheck {
   locale: string;
