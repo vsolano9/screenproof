@@ -14,12 +14,11 @@ It is the visual-asset sibling of [metaproof](https://github.com/vsolano9/metapr
 - Zero-dependency PNG and JPEG header parsing. **Fully offline. No network, no credentials, no telemetry.**
 - Zero-dependency ISO base-media and QuickTime atom parsing that skips encoded media payloads.
 
-## Browser fixture inspector
+## Browser inspector
 
 Open **[screenproof.vercel.app](https://screenproof.vercel.app)** to inspect files
 or a fastlane locale folder without installing anything. User files never leave
-the browser. The bundled examples are synthetic, including this deliberate
-failure:
+the browser. Try the bundled examples, including this deliberate failure:
 
 ```text
 FAIL  screenshot-unknown-dimensions
@@ -30,6 +29,11 @@ closest is 1170x2532 (iPhone 6.1-inch, portrait)
 Choose **Wrong size** to reproduce it, or drop your own PNG, JPEG, MOV, M4V, or
 MP4. The inspector runs the package's shared parsers and validation rules; it
 does not upload, persist, or log user media.
+
+The verdict distinguishes **PASS**, **PASS WITH WARNINGS**, and **FAIL**. Use
+**Copy JSON** or **Download JSON** to keep the report, and **Clear** to discard
+the selection and reset the inspector. For a full folder or CI, run
+`npx screenproof <folder>`. A pass covers enabled local checks, not App Store approval.
 
 ## Requirements
 

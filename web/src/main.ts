@@ -42,8 +42,8 @@ if (!app) throw new Error("missing app root");
 app.innerHTML = `
   <header class="site-header">
     <a class="wordmark" href="https://github.com/vsolano9/screenproof">screenproof</a>
-    <span class="product-name">App Store fixture inspector</span>
-    <span class="runtime-note">browser runtime / local only</span>
+    <span class="product-name">App Store media inspector</span>
+    <span class="runtime-note">local only · no uploads</span>
     <nav aria-label="Project links">
       <a href="https://github.com/vsolano9/screenproof">GitHub</a>
       <a href="https://www.npmjs.com/package/screenproof">npm</a>
@@ -54,7 +54,7 @@ app.innerHTML = `
       <div class="section-heading">
         <span aria-hidden="true">1.</span>
         <div>
-          <h1 id="input-heading">Inspect a fixture</h1>
+          <h1 id="input-heading">Check App Store screenshots and previews</h1>
           <p>Drop screenshots, app previews, or a locale folder.</p>
         </div>
       </div>
@@ -77,7 +77,7 @@ app.innerHTML = `
         <input id="folder-input" type="file" multiple webkitdirectory hidden />
       </div>
 
-      <h2 class="fixture-heading">Synthetic fixtures</h2>
+      <h2 class="fixture-heading">Try an example</h2>
       <div class="fixture-list" id="fixture-list">
         ${fixtures.map((fixture) => `
           <button type="button" class="fixture-button" data-fixture="${fixture.id}" aria-pressed="false">
@@ -88,7 +88,7 @@ app.innerHTML = `
       </div>
     </section>
 
-    <section class="results-panel" aria-labelledby="results-heading" aria-live="polite">
+    <section class="results-panel" aria-labelledby="results-heading">
       <div class="section-heading">
         <span aria-hidden="true">2.</span>
         <div>
@@ -96,13 +96,21 @@ app.innerHTML = `
           <p>Same parsers, rules, and reasons as the CLI.</p>
         </div>
       </div>
-      <div id="results" class="results-body">
+      <div id="results" class="results-body" aria-live="polite">
         <div class="empty-state">
           <div class="empty-frame" aria-hidden="true"></div>
-          <h3>No fixture selected</h3>
-          <p>Choose a synthetic failure or inspect your own files. Nothing is uploaded.</p>
+          <h3>No files selected</h3>
+          <p>Try an example or check your own files. Nothing is uploaded.</p>
         </div>
       </div>
+      <div class="report-actions" aria-label="Report actions">
+        <button type="button" class="button secondary" id="copy-json" disabled>Copy JSON</button>
+        <button type="button" class="button secondary" id="download-json" disabled>Download JSON</button>
+        <button type="button" class="button secondary" id="clear">Clear</button>
+      </div>
+      <p id="export-status" class="report-help" role="status"></p>
+      <p class="report-help">Check a full folder in your terminal: <code>npx screenproof &lt;folder&gt;</code></p>
+      <p class="report-help">A pass covers enabled local checks, not App Store approval. <a href="https://github.com/vsolano9/screenproof#limitations">See coverage and limitations.</a></p>
     </section>
   </main>
   <footer>
@@ -115,6 +123,11 @@ const results = requiredElement<HTMLDivElement>("#results");
 const fileInput = requiredElement<HTMLInputElement>("#file-input");
 const folderInput = requiredElement<HTMLInputElement>("#folder-input");
 const dropZone = requiredElement<HTMLDivElement>("#drop-zone");
+const emptyResults = results.innerHTML;
+const copyButton = requiredElement<HTMLButtonElement>("#copy-json");
+const downloadButton = requiredElement<HTMLButtonElement>("#download-json");
+const exportStatus = requiredElement<HTMLParagraphElement>("#export-status");
+let currentReport: LintReport | undefined;
 const inspection = new Inspection({
   start: beginInspection,
   complete: async (files, current) => {
@@ -132,6 +145,39 @@ fileInput.addEventListener("change", () => void inspectFiles([...fileInput.files
 folderInput.addEventListener("change", () => void inspectFiles([...folderInput.files ?? []]));
 requiredElement<HTMLButtonElement>("#choose-files").addEventListener("click", () => fileInput.click());
 requiredElement<HTMLButtonElement>("#choose-folder").addEventListener("click", () => folderInput.click());
+
+requiredElement<HTMLButtonElement>("#clear").addEventListener("click", () => {
+  inspection.cancel();
+  currentReport = undefined;
+  results.innerHTML = emptyResults;
+  fileInput.value = "";
+  folderInput.value = "";
+  setSelectedFixture("");
+  setControlsDisabled(false);
+  copyButton.disabled = downloadButton.disabled = true;
+  exportStatus.textContent = "";
+});
+copyButton.addEventListener("click", async () => {
+  const report = currentReport;
+  if (!report) return;
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+    if (currentReport === report) exportStatus.textContent = "JSON copied.";
+  } catch {
+    if (currentReport === report) exportStatus.textContent = "Clipboard access is unavailable. Use Download JSON instead.";
+  }
+});
+downloadButton.addEventListener("click", () => {
+  if (!currentReport) return;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(currentReport, null, 2)], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "screenproof-report.json";
+  link.click();
+  // Give the browser a task to consume the download before releasing its URL.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  exportStatus.textContent = "JSON download started.";
+});
 
 dropZone.addEventListener("click", () => fileInput.click());
 dropZone.addEventListener("keydown", (event) => {
@@ -169,7 +215,7 @@ async function loadFixture(id: string): Promise<void> {
   await inspection.run(fixture.label, async current => {
     const response = await fetch(fixture.source);
     if (!current()) return [];
-    if (!response.ok) throw new Error(`fixture request returned ${response.status}`);
+    if (!response.ok) throw new Error(`example request returned ${response.status}`);
     const file = new File([await response.blob()], fixture.path?.split("/").at(-1) ?? fixture.source.split("/").at(-1)!);
     if (fixture.path) Object.defineProperty(file, "webkitRelativePath", { value: `example/${fixture.path}` });
     return [file];
@@ -182,32 +228,36 @@ async function inspectFiles(files: readonly File[]): Promise<void> {
 }
 
 function beginInspection(label: string): void {
+  currentReport = undefined;
+  copyButton.disabled = downloadButton.disabled = true;
+  exportStatus.textContent = "";
   results.innerHTML = `<div class="loading-state"><span>Inspecting locally</span><strong>${escapeHtml(label)}</strong></div>`;
   setControlsDisabled(true);
 }
 
 function renderReport(report: LintReport, paths: readonly string[]): void {
   setControlsDisabled(false);
-  const gate = (report as LintReport & { gate?: "pass" | "pass-with-warnings" | "fail" }).gate
-    ?? (report.errorCount > 0 ? "fail" : report.warningCount > 0 ? "pass-with-warnings" : "pass");
+  currentReport = report;
+  copyButton.disabled = downloadButton.disabled = false;
+  const gate = report.gate;
   const status = gate === "fail" ? "FAIL" : gate === "pass-with-warnings" ? "PASS WITH WARNINGS" : "PASS";
   const summary = gate === "fail"
     ? `${report.errorCount} error${report.errorCount === 1 ? " blocks" : "s block"} this selection.`
     : gate === "pass-with-warnings" ? "Review the warnings before uploading." : "No enabled error or warning rule fired.";
   const rows = report.findings.length > 0
     ? report.findings.map((finding) => findingRow(finding)).join("")
-    : `<tr class="result-success"><td data-label="Result"><strong>PASS</strong></td><td data-label="File">${escapeHtml(paths.join(", "))}</td><td data-label="Rule"><code>all enabled rules</code></td><td data-label="Apple-style reason">No screenproof finding was emitted.</td></tr>`;
+    : `<tr class="result-success"><td data-label="Result"><strong>PASS</strong></td><td data-label="File">${escapeHtml(paths.join(", "))}</td><td data-label="Rule"><code>all enabled rules</code></td><td data-label="Why it needs attention">No enabled error or warning rule fired.</td></tr>`;
   results.innerHTML = `
     <div class="verdict is-${gate}" data-testid="verdict">
       <div>
-        <span>Selected fixture</span>
+        <span>Selected files</span>
         <h3>${escapeHtml(paths.length === 1 ? paths[0]! : `${paths.length} files`)}</h3>
       </div>
       <div class="verdict-lockup"><strong>${status}</strong><span>${escapeHtml(summary)}</span></div>
     </div>
     <div class="matrix-wrap">
       <table class="result-matrix">
-        <thead><tr><th>Result</th><th>File</th><th>Rule</th><th>Apple-style reason</th></tr></thead>
+        <thead><tr><th>Result</th><th>File</th><th>Rule</th><th>Why it needs attention</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -215,6 +265,7 @@ function renderReport(report: LintReport, paths: readonly string[]): void {
       <strong>${report.mode === "locale" ? "Locale tree" : "Flat files"}</strong>
       <span>${report.warningCount} warning${report.warningCount === 1 ? "" : "s"} · ${report.errorCount} error${report.errorCount === 1 ? "" : "s"}</span>
     </div>
+    ${report.unverifiedChecks.length ? `<div class="report-help"><strong>Not verified from available metadata</strong><ul>${report.unverifiedChecks.map(check => `<li>${escapeHtml(check.file ?? check.locale)}: ${escapeHtml(check.reason)} <code>${escapeHtml(check.check)}</code></li>`).join("")}</ul></div>` : ""}
   `;
 }
 
@@ -222,9 +273,9 @@ function findingRow(finding: Finding): string {
   const result = finding.severity === "error" ? "FAIL" : finding.severity === "warning" ? "WARN" : "INFO";
   return `<tr class="result-${finding.severity}" data-rule="${escapeHtml(finding.rule)}">
     <td data-label="Result"><strong>${result}</strong></td>
-    <td data-label="File">${escapeHtml(finding.file ?? (finding.locale || "fixture"))}</td>
+    <td data-label="File">${escapeHtml(finding.file ?? (finding.locale || "selection"))}</td>
     <td data-label="Rule"><code>${escapeHtml(finding.rule)}</code></td>
-    <td data-label="Apple-style reason">${escapeHtml(finding.message)}</td>
+    <td data-label="Why it needs attention">${escapeHtml(finding.message)}</td>
   </tr>`;
 }
 
