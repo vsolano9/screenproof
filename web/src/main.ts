@@ -71,10 +71,10 @@ app.innerHTML = `
       </div>
 
       <div class="chooser-row">
-        <label class="button primary" for="file-input">Choose files</label>
-        <input id="file-input" type="file" multiple accept=".png,.jpg,.jpeg,.mov,.m4v,.mp4" />
-        <label class="button secondary" for="folder-input">Choose folder</label>
-        <input id="folder-input" type="file" multiple webkitdirectory />
+        <button class="button primary" type="button" id="choose-files">Choose files</button>
+        <input id="file-input" type="file" multiple accept=".png,.jpg,.jpeg,.mov,.m4v,.mp4" hidden />
+        <button class="button secondary" type="button" id="choose-folder">Choose folder</button>
+        <input id="folder-input" type="file" multiple webkitdirectory hidden />
       </div>
 
       <h2 class="fixture-heading">Synthetic fixtures</h2>
@@ -130,6 +130,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture
 
 fileInput.addEventListener("change", () => void inspectFiles([...fileInput.files ?? []]));
 folderInput.addEventListener("change", () => void inspectFiles([...folderInput.files ?? []]));
+requiredElement<HTMLButtonElement>("#choose-files").addEventListener("click", () => fileInput.click());
+requiredElement<HTMLButtonElement>("#choose-folder").addEventListener("click", () => folderInput.click());
 
 dropZone.addEventListener("click", () => fileInput.click());
 dropZone.addEventListener("keydown", (event) => {
@@ -186,15 +188,17 @@ function beginInspection(label: string): void {
 
 function renderReport(report: LintReport, paths: readonly string[]): void {
   setControlsDisabled(false);
-  const status = report.ok ? "PASS" : "FAIL";
-  const summary = report.ok
-    ? "No enabled error rule fired."
-    : `${report.errorCount} error${report.errorCount === 1 ? "" : "s"} block this fixture.`;
+  const gate = (report as LintReport & { gate?: "pass" | "pass-with-warnings" | "fail" }).gate
+    ?? (report.errorCount > 0 ? "fail" : report.warningCount > 0 ? "pass-with-warnings" : "pass");
+  const status = gate === "fail" ? "FAIL" : gate === "pass-with-warnings" ? "PASS WITH WARNINGS" : "PASS";
+  const summary = gate === "fail"
+    ? `${report.errorCount} error${report.errorCount === 1 ? " blocks" : "s block"} this selection.`
+    : gate === "pass-with-warnings" ? "Review the warnings before uploading." : "No enabled error or warning rule fired.";
   const rows = report.findings.length > 0
     ? report.findings.map((finding) => findingRow(finding)).join("")
     : `<tr class="result-success"><td data-label="Result"><strong>PASS</strong></td><td data-label="File">${escapeHtml(paths.join(", "))}</td><td data-label="Rule"><code>all enabled rules</code></td><td data-label="Apple-style reason">No screenproof finding was emitted.</td></tr>`;
   results.innerHTML = `
-    <div class="verdict ${report.ok ? "is-pass" : "is-fail"}" data-testid="verdict">
+    <div class="verdict is-${gate}" data-testid="verdict">
       <div>
         <span>Selected fixture</span>
         <h3>${escapeHtml(paths.length === 1 ? paths[0]! : `${paths.length} files`)}</h3>
@@ -227,6 +231,7 @@ function findingRow(finding: Finding): string {
 function renderReadError(label: string, error: unknown): void {
   setControlsDisabled(false);
   results.innerHTML = `<div class="read-error"><strong>Could not inspect ${escapeHtml(label)}</strong><p>${escapeHtml(error instanceof Error ? error.message : String(error))}</p></div>`;
+  results.insertAdjacentHTML("beforeend", `<p class="recovery-note">Choose your files again, or select fewer files. Nothing was uploaded.</p>`);
 }
 
 function setSelectedFixture(id: string): void {
@@ -236,7 +241,7 @@ function setSelectedFixture(id: string): void {
 }
 
 function setControlsDisabled(disabled: boolean): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture]")) button.disabled = disabled;
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture], #choose-files, #choose-folder")) button.disabled = disabled;
   fileInput.disabled = disabled;
   folderInput.disabled = disabled;
 }
