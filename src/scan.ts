@@ -31,7 +31,6 @@ function isHidden(name: string): boolean {
   return name.startsWith(".");
 }
 
-
 interface DirEntry {
   name: string;
   isFile(): boolean;
@@ -112,7 +111,6 @@ async function scanPreview(dir: string, name: string, locale: string): Promise<P
       : { ok: false, reason: `unsupported app-preview extension ${fileExtension(name)}` },
   };
 }
-
 
 function missingFinding(message: string): Finding {
   return { locale: "", rule: "missing-screenshots", severity: "error", message };

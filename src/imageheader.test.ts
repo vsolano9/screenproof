@@ -242,7 +242,21 @@ test("bounded PNG parsing still requires pre-IDAT transparency chunks", () => {
   assert.match(expectFail(prefix), /truncated PNG/);
   const result = parseImageHeader(prefix, 1_000_000);
   assert.equal(result.ok, false);
-  if (!result.ok) assert.match(result.reason, /truncated PNG/);
+  // The file is intact; only the caller's read budget ran out, so transparency
+  // is unproven. Reporting truncation here would misdiagnose a valid file.
+  if (!result.ok) assert.match(result.reason, /exceeds the bounded header read/);
+});
+
+test("an exhausted read budget is not reported as a truncated JPEG", () => {
+  const padded = new Uint8Array(8192);
+  padded.set(makeJpeg(1320, 2868).subarray(0, 2));
+  // An APP1 segment whose declared length runs past the bounded prefix.
+  padded.set(new Uint8Array([0xff, 0xe1, 0x10, 0x02]), 2);
+  const prefix = padded.subarray(0, 64);
+  assert.match(expectFail(prefix), /truncated JPEG/);
+  const bounded = parseImageHeader(prefix, padded.length);
+  assert.equal(bounded.ok, false);
+  if (!bounded.ok) assert.match(bounded.reason, /exceeds the bounded header read/);
 });
 
 test("bounded PNG parsing rejects an IDAT that exceeds the original file", () => {

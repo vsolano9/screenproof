@@ -53,6 +53,14 @@ const PNG_BIT_DEPTHS_BY_COLOR_TYPE: Readonly<Record<number, readonly number[]>> 
   6: [8, 16],
 };
 
+/**
+ * Callers may pass a bounded prefix of a larger file. A structure that ends
+ * past the loaded bytes but inside the real file exhausted that read budget;
+ * it is not evidence that the file itself is truncated.
+ */
+const PNG_BUDGET = "PNG metadata exceeds the bounded header read; transparency could not be checked";
+const JPEG_BUDGET = "JPEG metadata exceeds the bounded header read; the frame header was not reached";
+
 function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
   // Signature (8) + length (4) + "IHDR" (4) + data (13) + CRC (4) = 33.
   if (buf.length < 33) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
@@ -87,7 +95,7 @@ function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
   let offset = 33;
   while (!hasAlpha) {
     if (offset + 8 > buf.length) {
-      return { ok: false, reason: "truncated PNG (incomplete chunk header before IDAT)" };
+      return { ok: false, reason: offset + 8 > sizeBytes ? "truncated PNG (incomplete chunk header before IDAT)" : PNG_BUDGET };
     }
     const length = readU32BE(buf, offset);
     if (length > 0x7fffffff) {
@@ -101,7 +109,7 @@ function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
     const isImageEnd = chunkTypeEquals(buf, offset + 4, "IEND");
     if (isImageData || isImageEnd) break;
     if (chunkEnd > buf.length) {
-      return { ok: false, reason: "truncated PNG (chunk is outside the loaded header)" };
+      return { ok: false, reason: PNG_BUDGET };
     }
     if (chunkTypeEquals(buf, offset + 4, "tRNS")) {
       if (colorType === 3) {
@@ -124,17 +132,20 @@ function isSofMarker(marker: number): boolean {
   return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
 }
 
-
-function parseJpeg(buf: Uint8Array): ParseResult {
+function parseJpeg(buf: Uint8Array, sizeBytes: number): ParseResult {
+  const outOfBytes: ParseResult = {
+    ok: false,
+    reason: buf.length < sizeBytes ? JPEG_BUDGET : "truncated JPEG (no frame header)",
+  };
   let i = 2; // past SOI
   while (true) {
-    if (i + 1 >= buf.length) return { ok: false, reason: "truncated JPEG (no frame header)" };
+    if (i + 1 >= buf.length) return outOfBytes;
     if (buf[i] !== 0xff) return { ok: false, reason: "invalid JPEG marker structure" };
 
     // Skip fill bytes: any number of 0xFF may pad before the marker byte.
     let j = i + 1;
     while (j < buf.length && buf[j] === 0xff) j++;
-    if (j >= buf.length) return { ok: false, reason: "truncated JPEG (no frame header)" };
+    if (j >= buf.length) return outOfBytes;
     const marker = buf[j]!;
 
     // Standalone markers without a length field.
@@ -144,7 +155,9 @@ function parseJpeg(buf: Uint8Array): ParseResult {
     }
     if (marker === 0xd9) return { ok: false, reason: "no JPEG frame header found" };
 
-    if (j + 2 >= buf.length) return { ok: false, reason: "truncated JPEG (segment length)" };
+    if (j + 2 >= buf.length) {
+      return { ok: false, reason: j + 2 >= sizeBytes ? "truncated JPEG (segment length)" : JPEG_BUDGET };
+    }
     const segmentLength = readU16BE(buf, j + 1);
     if (segmentLength < 2) return { ok: false, reason: "invalid JPEG segment length" };
 
@@ -157,7 +170,7 @@ function parseJpeg(buf: Uint8Array): ParseResult {
       if (segmentLength < 8) return { ok: false, reason: "invalid JPEG frame header length: missing component count" };
       const segmentEnd = j + 1 + segmentLength;
       if (segmentEnd > buf.length) {
-        return { ok: false, reason: "truncated JPEG (frame segment exceeds file bounds)" };
+        return { ok: false, reason: segmentEnd > sizeBytes ? "truncated JPEG (frame segment exceeds file bounds)" : JPEG_BUDGET };
       }
       const componentCount = buf[j + 8]!;
       if (componentCount === 0) {
@@ -180,10 +193,11 @@ function parseJpeg(buf: Uint8Array): ParseResult {
 
 /**
  * Parse a PNG or JPEG header from raw bytes. `sizeBytes` is the original file
- * size when `buf` is a bounded prefix, allowing PNG parsing to stop at IDAT.
+ * size when `buf` is a bounded prefix: PNG parsing stops at IDAT, and both
+ * parsers distinguish a real truncation from an exhausted read budget.
  */
 export function parseImageHeader(buf: Uint8Array, sizeBytes = buf.length): ParseResult {
   if (isPng(buf)) return parsePng(buf, sizeBytes);
-  if (isJpeg(buf)) return parseJpeg(buf);
+  if (isJpeg(buf)) return parseJpeg(buf, sizeBytes);
   return { ok: false, reason: "not a PNG or JPEG file" };
 }

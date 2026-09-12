@@ -63,7 +63,6 @@ const H264_PROFILE_NAMES: Readonly<Record<number, string>> = {
   244: "High 4:4:4 Predictive",
 };
 
-
 /** Apple: "44.1kHz or 48kHz". */
 const AUDIO_SAMPLE_RATES: ReadonlySet<number> = new Set([44_100, 48_000]);
 
