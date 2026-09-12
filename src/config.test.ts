@@ -13,7 +13,7 @@ test("default rule levels match the plan", () => {
     "screenshot-unknown-dimensions": "error",
     "screenshot-count-over": "error",
     "screenshot-format": "error",
-    "screenshot-png-alpha": "warning",
+    "screenshot-png-alpha": "error",
     "screenshot-unexpected-file": "warning",
     "screenshot-unknown-locale": "warning",
     "screenshot-locale-empty": "warning",
@@ -60,6 +60,16 @@ test("mergeConfig rejects unknown rule ids so typos cannot silently disable a ru
     () => mergeConfig(defaultConfig(), { rules: { "screenshot-png-alfa": "off" } }),
     /config\.rules\.screenshot-png-alfa is not a known rule id/,
   );
+});
+
+test("mergeConfig rejects inherited Object property names as rule ids", () => {
+  for (const key of ["__proto__", "constructor", "toString"]) {
+    const input = JSON.parse(`{"rules":{"${key}":"off"}}`);
+    assert.throws(
+      () => mergeConfig(defaultConfig(), input),
+      new RegExp(`config\\.rules\\.${key} is not a known rule id`),
+    );
+  }
 });
 
 test("mergeConfig rejects a non-object config", () => {

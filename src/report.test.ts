@@ -10,15 +10,18 @@ function report(findings: Finding[], opts: { mode?: "locale" | "flat" } = {}): L
     return { locale, findings: own, ok: own.every((f) => f.severity !== "error") };
   });
   const errorCount = findings.filter((f) => f.severity === "error").length;
+  const warningCount = findings.filter((f) => f.severity === "warning").length;
   return {
     root: "/x/screenshots",
     mode: opts.mode ?? "locale",
     locales,
     findings,
     errorCount,
-    warningCount: findings.filter((f) => f.severity === "warning").length,
+    warningCount,
     infoCount: findings.filter((f) => f.severity === "info").length,
     ok: errorCount === 0,
+    gate: errorCount > 0 ? "fail" : warningCount > 0 ? "pass-with-warnings" : "pass",
+    unverifiedChecks: [],
   };
 }
 
@@ -61,12 +64,39 @@ test("human output shows PASS and ok locales when clean", () => {
   assert.match(text, /PASS/);
 });
 
-test("quiet hides clean locales and info findings", () => {
-  const r = report([INFO]);
+test("human output distinguishes warnings and strict warning failures", () => {
+  const warning = report([WARNING]);
+  assert.match(renderHuman(warning), /PASS WITH WARNINGS/);
+  warning.gate = "fail";
+  const strict = renderHuman(warning);
+  assert.match(strict, /FAIL/);
+  assert.equal(strict.includes("PASS"), false);
+});
+
+test("quiet hides clean locales and info findings at locale and report level", () => {
+  const r = report([
+    INFO,
+    { ...INFO, locale: "", file: "stray.txt", message: "root note" },
+  ]);
   r.locales.push({ locale: "de-DE", findings: [], ok: true });
   const text = renderHuman(r, { quiet: true });
   assert.equal(text.includes("de-DE"), false);
   assert.equal(text.includes("note"), false);
+  assert.equal(text.includes("stray.txt"), false);
+  assert.match(text, /2 info/);
+});
+
+test("human output lists unverified checks separately from findings", () => {
+  const r = report([]);
+  r.unverifiedChecks = [{
+    locale: "en-US",
+    file: "preview.mp4",
+    check: "preview-frame-rate",
+    reason: "frame rate is not declared in readable metadata",
+  }];
+  const text = renderHuman(r);
+  assert.match(text, /Unverified checks:/);
+  assert.match(text, /preview-frame-rate.*frame rate is not declared/);
 });
 
 test("flat mode shows a mode marker and renders the empty locale as a dot", () => {
@@ -82,6 +112,7 @@ test("report-level findings (empty locale, locale mode) render without a locale 
   r.findings = [rootFinding];
   r.errorCount = 1;
   r.ok = false;
+  r.gate = "fail";
   r.locales = [];
   const text = renderHuman(r);
   assert.match(text, /screenshots folder not found/);
@@ -107,6 +138,7 @@ test("report-level warnings render the warning marker and file name, not the err
   };
   r.findings = [stray];
   r.warningCount = 1;
+  r.gate = "pass-with-warnings";
   r.locales = [];
   const text = renderHuman(r);
   const line = text.split("\n").find((l) => l.includes("must live inside"));
@@ -114,7 +146,7 @@ test("report-level warnings render the warning marker and file name, not the err
   assert.equal(line.includes("✖"), false);
   assert.match(line, /warning/);
   assert.match(line, /stray\.txt/);
-  assert.match(text, /PASS/);
+  assert.match(text, /PASS WITH WARNINGS/);
 });
 
 test("color output uses theme ANSI and strips under NO_COLOR", () => {

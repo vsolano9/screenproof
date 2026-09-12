@@ -19,11 +19,14 @@ import type {
   RuleLevel,
   ScanResult,
   Severity,
+  UnverifiedCheck,
 } from "./types.ts";
 
 export interface ValidateOptions {
   /** Locale folders of a deliver metadata tree, for the cross-tree check. */
   metadataLocales?: string[] | null;
+  /** Treat warnings as a failing gate without changing `ok` semantics. */
+  strict?: boolean;
 }
 
 /**
@@ -180,6 +183,7 @@ const PRIMARY_BY_PLATFORM: ReadonlyArray<{ platform: string; classId: string; me
 export function validate(scan: ScanResult, config: Config, options: ValidateOptions = {}): LintReport {
   const classes = applyDimensionOverrides(DEFAULT_CLASSES, config.dimensions);
   const findings: Finding[] = [];
+  const unverifiedChecks: UnverifiedCheck[] = [];
 
   const levelOf = (rule: string): RuleLevel =>
     config.rules[rule] ?? DEFAULT_RULES[rule] ?? "warning";
@@ -312,6 +316,40 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         emit("preview-codec", locale.locale, codecProblem, file.name);
       }
 
+      if (frameRate === null) {
+        unverifiedChecks.push({
+          locale: locale.locale,
+          file: file.name,
+          check: "preview-frame-rate",
+          reason: "frame rate is not declared in readable sample metadata",
+        });
+      }
+      if ((codecFourCC === "avc1" || codecFourCC === "avc3") && avc === null) {
+        unverifiedChecks.push({
+          locale: locale.locale,
+          file: file.name,
+          check: "preview-h264-profile",
+          reason: "H.264 profile and level are not declared in a readable avcC box",
+        });
+      }
+      for (const track of audioTracks) {
+        if (track.codec === "unknown") {
+          unverifiedChecks.push({
+            locale: locale.locale,
+            file: file.name,
+            check: "preview-audio-codec",
+            reason: `audio codec is not identified by sample entry ${track.codecFourCC}`,
+          });
+        } else if (track.codec === "pcm" && track.bitDepth === null) {
+          unverifiedChecks.push({
+            locale: locale.locale,
+            file: file.name,
+            check: "preview-audio-bit-depth",
+            reason: `PCM bit depth is not declared by sample entry ${track.codecFourCC}`,
+          });
+        }
+      }
+
       if (frameRate !== null && frameRate > MAX_PREVIEW_FPS) {
         emit(
           "preview-frame-rate",
@@ -439,10 +477,15 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     }
   }
 
-  return assemble(scan, findings);
+  return assemble(scan, findings, unverifiedChecks, options.strict ?? false);
 }
 
-function assemble(scan: ScanResult, findings: Finding[]): LintReport {
+function assemble(
+  scan: ScanResult,
+  findings: Finding[],
+  unverifiedChecks: UnverifiedCheck[],
+  strict: boolean,
+): LintReport {
   const sortFindings = (a: Finding, b: Finding): number =>
     a.rule.localeCompare(b.rule) || (a.file ?? "").localeCompare(b.file ?? "") || a.message.localeCompare(b.message);
 
@@ -469,6 +512,13 @@ function assemble(scan: ScanResult, findings: Finding[]): LintReport {
 
   const count = (severity: Severity): number => flattened.filter((f) => f.severity === severity).length;
   const errorCount = count("error");
+  const warningCount = count("warning");
+  const gate =
+    errorCount > 0 || (strict && warningCount > 0)
+      ? "fail"
+      : warningCount > 0
+        ? "pass-with-warnings"
+        : "pass";
 
   return {
     root: scan.root,
@@ -476,8 +526,10 @@ function assemble(scan: ScanResult, findings: Finding[]): LintReport {
     locales,
     findings: flattened,
     errorCount,
-    warningCount: count("warning"),
+    warningCount,
     infoCount: count("info"),
     ok: errorCount === 0,
+    gate,
+    unverifiedChecks,
   };
 }

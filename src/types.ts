@@ -6,6 +6,7 @@
  */
 
 export type Severity = "error" | "warning" | "info";
+export type GateStatus = "pass" | "pass-with-warnings" | "fail";
 
 /** A rule level as configured by the user. `off` disables the rule. */
 export type RuleLevel = Severity | "off";
@@ -144,6 +145,14 @@ export interface Finding {
   message: string;
 }
 
+export interface UnverifiedCheck {
+  locale: string;
+  file?: string;
+  /** Rule-shaped check that could not be evaluated from available metadata. */
+  check: string;
+  reason: string;
+}
+
 export interface LocaleReport {
   locale: string;
   findings: Finding[];
@@ -162,6 +171,10 @@ export interface LintReport {
   infoCount: number;
   /** True when there are no `error`-severity findings. */
   ok: boolean;
+  /** Effective validation gate, including strict warning policy when requested. */
+  gate: GateStatus;
+  /** Checks skipped because the required metadata was absent or unknown. */
+  unverifiedChecks: UnverifiedCheck[];
 }
 
 export interface LocaleConfig {

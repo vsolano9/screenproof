@@ -363,6 +363,18 @@ test("report assembly: counts, ok flags, deterministic order, mode copied", () =
   assert.equal(report.findings.length, 3);
 });
 
+test("report gate distinguishes clean, warning, error, and strict-warning results", () => {
+  const clean = validate(scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736)])]), defaultConfig());
+  assert.equal(clean.gate, "pass");
+
+  const warningScan = scanResult([localeScan("en_US", [png("01.png", "en_US", 1260, 2736)], { known: false })]);
+  assert.equal(validate(warningScan, defaultConfig()).gate, "pass-with-warnings");
+  assert.equal(validate(warningScan, defaultConfig(), { strict: true }).gate, "fail");
+
+  const errorScan = scanResult([localeScan("en-US", [png("bad.png", "en-US", 500, 500)])]);
+  assert.equal(validate(errorScan, defaultConfig()).gate, "fail");
+});
+
 test("flat mode runs file-level checks only: no count, primary, or locale-empty rules", () => {
   const eleven = Array.from({ length: 11 }, (_, i) => png(`${String(i).padStart(2, "0")}.png`, "", 1284, 2778));
   const scan = scanResult([localeScan("", eleven)], { mode: "flat" });
@@ -534,6 +546,27 @@ test("a preview with no avcC is not judged on profile", () => {
   const previews = [preview("prores.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", avc: null })];
   const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
   assert.deepEqual(byRule(report, "preview-h264-profile"), []);
+});
+
+test("unknown preview metadata is listed as unverified rather than silently passed", () => {
+  const previews = [preview("unknown.mp4", "en-US", 20, 886, 1920, {
+    frameRate: null,
+    avc: null,
+    audioTracks: [{
+      codecFourCC: "mp4a",
+      codec: "unknown",
+      channelCount: 2,
+      sampleRateHz: 44_100,
+      bitDepth: null,
+      enabled: true,
+    }],
+  })];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(report.unverifiedChecks.map((check) => check.check), [
+    "preview-frame-rate",
+    "preview-h264-profile",
+    "preview-audio-codec",
+  ]);
 });
 
 test("a silent app preview is reported once, not as a layout problem", () => {
