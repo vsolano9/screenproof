@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:pack
+      - run: npm ci --prefix web
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - name: Composite action accepts a conforming fixture
+        uses: ./
+        with:
+          path: fixtures/action/good
+      - name: Composite action rejects a nonconforming fixture
+        id: bad-action
+        continue-on-error: true
+        uses: ./
+        with:
+          path: fixtures/action/bad
+      - name: Require the negative composite-action check to fail
+        if: steps.bad-action.outcome != 'failure'
+        run: exit 1
