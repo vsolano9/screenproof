@@ -85,3 +85,25 @@ test("user-provided file names are escaped in report markup", () => {
   });
   assert.ok(!html.includes("<b>unsafe</b>"));
 });
+
+
+test("unexpected non-media files remain visible even without asset rows", () => {
+  const { rows, report } = selection([
+    { name: "01.png", bytes: good },
+    { name: "notes.txt", bytes: new Uint8Array() },
+  ]);
+  assert.equal(rows.length, 1);
+  const html = filteredFindings(rows, report, { locale: "*", device: "*", search: "", issues: true });
+  assert.ok(html.includes("notes.txt"));
+  assert.ok(html.includes("screenshot-unexpected-file"));
+});
+
+test("unexpected nested folders remain visible without asset rows", () => {
+  const { rows, report } = selection([
+    { name: "01.png", path: "en-US/archive/01.png", bytes: good },
+  ]);
+  assert.equal(rows.length, 0);
+  const html = filteredFindings(rows, report, { locale: "*", device: "*", search: "", issues: true });
+  assert.ok(html.includes("archive/"));
+  assert.ok(html.includes("screenshot-unexpected-file"));
+});

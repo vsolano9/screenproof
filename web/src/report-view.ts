@@ -58,7 +58,7 @@ export function reportView(
     ${report.unverifiedChecks.length ? `<details class="unverified" open><summary>${icon("info")}${report.unverifiedChecks.length} checks could not be verified</summary><ul>${report.unverifiedChecks.map((check) => `<li><strong>${esc(check.file ?? check.locale)}</strong>: ${esc(check.reason)} <code>${esc(check.check)}</code></li>`).join("")}</ul></details>` : ""}`;
 }
 function finding(f: Finding): string {
-  return `<div class="finding ${f.severity}">${icon(f.severity === "error" ? "x" : f.severity === "warning" ? "warning" : "info")}<div><p>${esc(f.message)}</p><code>${esc(f.rule)}</code></div></div>`;
+  return `<div class="finding ${f.severity}">${icon(f.severity === "error" ? "x" : f.severity === "warning" ? "warning" : "info")}<div>${f.file ? `<strong>${esc(f.file)}</strong>` : ""}<p>${esc(f.message)}</p><code>${esc(f.rule)}</code></div></div>`;
 }
 export function filteredFindings(
   rows: AssetRow[],
@@ -82,8 +82,12 @@ export function filteredFindings(
     entries.push(row);
     groups.set(key, entries);
   }
+  const attached = new Set(rows.flatMap((row) => row.findings));
+  // Non-media files and unexpected folders have findings but no asset row.
+  // Keep them visible instead of displaying a warning with no explanation.
   const context = report.findings.filter(
-    (f) => !f.file && (filter.locale === "*" || filter.locale === f.locale),
+    (f) => (!f.file || !attached.has(f)) &&
+      (filter.locale === "*" || filter.locale === f.locale),
   );
   const contextHtml = context.length
     ? `<div class="selection-findings"><h4>Folder and selection findings</h4>${context.map(finding).join("")}</div>`

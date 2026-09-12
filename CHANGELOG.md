@@ -6,7 +6,7 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
-## Unreleased
+## 0.7.0 - 2026-09-12
 
 ### Added
 
@@ -57,6 +57,13 @@ called out below.
   and FAIL, and discloses unknown-metadata checks separately.
 
 ### Fixed
+
+- Windows release checks normalize roots before JSON escaping, run npm using
+  its JavaScript entry point, and clean build output without Unix shell commands.
+  CI now runs on Linux and Windows. POSIX permission and unavailable file-symlink
+  tests skip explicitly; directory junction scanning is exercised separately.
+- Report findings for non-media files and nested folders remain visible even
+  when there is no asset row to attach them to.
 
 - Release-review regressions RR-01 through RR-05: MPEG-4 AudioSpecificConfig
   distinguishes AAC from MPEG Layer 3/CELP and missing declarations; invalid

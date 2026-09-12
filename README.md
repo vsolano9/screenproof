@@ -26,7 +26,7 @@ FAIL  screenshot-unknown-dimensions
 closest is 1170x2532 (iPhone 6.1-inch, portrait)
 ```
 
-Choose **Wrong size** to reproduce it, or drop your own PNG, JPEG, MOV, M4V, or
+Choose **Wrong dimensions** to reproduce it, or drop your own PNG, JPEG, MOV, M4V, or
 MP4. The inspector runs the package's shared parsers and validation rules; it
 does not upload, persist, or log user media.
 
@@ -34,8 +34,15 @@ The verdict distinguishes **PASS**, **PASS WITH WARNINGS**, and **FAIL**. Use
 **Copy JSON** or **Download JSON** to keep the report, and **Clear** to discard
 the selection and reset the inspector. For a full folder or CI, run
 `npx screenproof <folder>`. A pass covers enabled local checks, not App Store approval.
+The redesigned inspector includes asset counts, locale/device filters, search,
+and Issues/All assets views. Missing metadata uses a review presentation even
+when the underlying enabled-rule gate passes.
 
 ## Requirements
+
+The CLI and package consumer are tested on Linux and Windows in CI. macOS is
+also exercised locally. File-symlink tests require the corresponding OS
+permissions; Windows directory junctions are tested independently.
 
 Node.js 24 or newer, and zero runtime dependencies. The published package ships compiled JavaScript, so `npx screenproof` and `npm install` just work with no build step on your side.
 
@@ -208,7 +215,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 ## GitHub Action
 
 ```yaml
-- uses: vsolano9/screenproof@v0.6.0
+- uses: vsolano9/screenproof@v0.7.0
   with:
     path: fastlane/screenshots
     strict: "true"
@@ -217,7 +224,7 @@ Drop a `screenproof.json` next to where you run the tool, or pass `--config`. Ev
 
 The exact tag keeps CI reproducible and includes the complete shipped app-preview
 rule set plus `tRNS` transparency validation. The moving `@v0` tag points to the
-same `v0.6.0` release.
+same `v0.7.0` release.
 
 ## Programmatic API
 

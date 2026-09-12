@@ -1,6 +1,6 @@
 {
   "name": "screenproof",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Lint App Store screenshots and app previews against Apple's published dimensions, format, duration, file-size, and count rules. Offline, zero dependencies.",
   "type": "module",
   "bin": {
@@ -30,7 +30,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "clean": "rm -rf dist",
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true });\"",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "test:pack": "node scripts/test-pack.mjs",

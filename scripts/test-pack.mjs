@@ -6,7 +6,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCli = process.env.npm_execpath;
+if (!npmCli) throw new Error("Run this check with npm run test:pack");
+// Launch npm through Node, not a platform-specific .cmd shell wrapper.
 const temporary = await mkdtemp(join(tmpdir(), "screenproof-pack-"));
 
 function run(command, args, cwd, capture = false) {
@@ -26,11 +28,11 @@ function run(command, args, cwd, capture = false) {
 }
 
 try {
-  const packed = await run(npm, ["pack", "--json", "--pack-destination", temporary], root, true);
+  const packed = await run(process.execPath, [npmCli, "pack", "--json", "--pack-destination", temporary], root, true);
   const [{ filename }] = JSON.parse(packed);
   const tarball = join(temporary, filename);
   await writeFile(join(temporary, "package.json"), JSON.stringify({ private: true }));
-  await run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], temporary);
+  await run(process.execPath, [npmCli, "install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], temporary);
   await writeFile(join(temporary, "use.mts"), await readFile(join(root, "scripts", "pack-consumer", "use.mts")));
   await writeFile(join(temporary, "tsconfig.json"), JSON.stringify({
     compilerOptions: {

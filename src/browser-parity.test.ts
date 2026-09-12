@@ -34,7 +34,7 @@ for (const [label, paths, mode, count, rules] of [
       const scanned = await scan(root, defaultConfig());
       const cli = validate(scanned, defaultConfig());
       const browser = inspectBrowserFixtures(inputs);
-      const normalize = (report: typeof cli) => JSON.parse(JSON.stringify(report).replaceAll(root, "ROOT").replaceAll("browser", "ROOT"));
+      const normalize = (report: typeof cli) => JSON.parse(JSON.stringify(report, (_key, value: unknown) => typeof value === "string" ? value.replaceAll(root, "ROOT").replaceAll("browser", "ROOT") : value));
       assert.equal(browser.mode, mode);
       assert.equal(scanned.locales.reduce((sum, locale) => sum + locale.files.length, 0), count);
       assert.deepEqual(browser.findings.map(f => f.rule).sort(), [...rules].sort());
