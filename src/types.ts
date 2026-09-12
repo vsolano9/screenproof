@@ -56,15 +56,21 @@ export interface AvcConfig {
   levelIndication: number;
 }
 
+export type PreviewAudioCodec = "aac" | "mp3" | "pcm" | "unknown";
+
 /** One audio track's declared configuration. */
 export interface PreviewAudioTrack {
-  /** Sample-entry FourCC, e.g. `mp4a` for AAC or `lpcm`/`sowt`/`twos` for PCM. */
+  /** Container sample-entry FourCC, which does not by itself identify `mp4a` audio. */
   codecFourCC: string;
+  /** Actual codec derived from `esds` or a PCM-specific sample-entry FourCC. */
+  codec: PreviewAudioCodec;
   channelCount: number;
   /** Sample rate in hertz, e.g. `44100`. */
   sampleRateHz: number;
-  /** Declared sample size in bits. Only meaningful for PCM. */
-  bitDepth: number;
+  /** PCM sample depth, or null when the codec/depth is not known or not PCM. */
+  bitDepth: number | null;
+  /** Version-2 Core Audio format flags, when present for LPCM. */
+  pcmFormatFlags?: number;
   /** False when the track header's `track_enabled` flag is clear. */
   enabled: boolean;
 }

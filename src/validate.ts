@@ -63,10 +63,6 @@ const H264_PROFILE_NAMES: Readonly<Record<number, string>> = {
   244: "High 4:4:4 Predictive",
 };
 
-/** Uncompressed audio sample entries, which Apple allows only alongside ProRes. */
-const PCM_FOURCCS: ReadonlySet<string> = new Set([
-  "lpcm", "sowt", "twos", "raw ", "in24", "in32", "fl32", "fl64",
-]);
 
 /** Apple: "44.1kHz or 48kHz". */
 const AUDIO_SAMPLE_RATES: ReadonlySet<number> = new Set([44_100, 48_000]);
@@ -122,16 +118,19 @@ function audioProblems(
   const prores = videoCodecFourCC === "apch";
   const seenCodecProblem = new Set<string>();
   for (const track of tracks) {
-    const isPcm = PCM_FOURCCS.has(track.codecFourCC);
-    const isAac = track.codecFourCC === "mp4a";
-    if (!isAac && !(isPcm && prores) && !seenCodecProblem.has(track.codecFourCC)) {
-      seenCodecProblem.add(track.codecFourCC);
-      problems.push({
-        rule: "preview-audio-codec",
-        message: isPcm
-          ? `audio sample entry ${track.codecFourCC} is PCM, which Apple accepts only with ProRes 422 HQ; an H.264 preview needs 256 kbps AAC`
-          : `audio sample entry ${track.codecFourCC} is not accepted; use 256 kbps AAC${prores ? " or PCM" : ""}`,
-      });
+    const isPcm = track.codec === "pcm";
+    const isAac = track.codec === "aac";
+    if (!isAac && !(isPcm && prores) && !seenCodecProblem.has(track.codec)) {
+      seenCodecProblem.add(track.codec);
+      let message: string;
+      if (isPcm) {
+        message = `audio sample entry ${track.codecFourCC} is PCM, which Apple accepts only with ProRes 422 HQ; an H.264 preview needs AAC`;
+      } else if (track.codec === "mp3") {
+        message = `audio codec is MP3 inside sample entry ${track.codecFourCC}; App Store previews require AAC${prores ? " or PCM" : ""}`;
+      } else {
+        message = `audio codec cannot be verified from sample entry ${track.codecFourCC}; use AAC${prores ? " or PCM" : ""}`;
+      }
+      problems.push({ rule: "preview-audio-codec", message });
     }
 
     if (track.sampleRateHz > 0 && !AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
@@ -141,7 +140,7 @@ function audioProblems(
       });
     }
 
-    if (isPcm && track.bitDepth > 0 && !PCM_BIT_DEPTHS.has(track.bitDepth)) {
+    if (isPcm && track.bitDepth !== null && !PCM_BIT_DEPTHS.has(track.bitDepth)) {
       problems.push({
         rule: "preview-audio-bit-depth",
         message: `PCM audio is ${track.bitDepth}-bit; Apple accepts 16-, 24-, or 32-bit`,
