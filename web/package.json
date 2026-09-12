@@ -6,6 +6,7 @@
   "scripts": {
     "fixtures": "node scripts/generate-fixtures.mjs",
     "generate-og": "node scripts/generate-og.mjs",
+    "test": "node --test test/*.test.ts",
     "build": "npm run fixtures && tsc --noEmit && vite build",
     "dev": "npm run fixtures && vite",
     "preview": "vite preview"

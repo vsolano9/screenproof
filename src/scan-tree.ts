@@ -17,8 +17,6 @@ interface PlannedLocale {
   unexpectedFiles: string[];
 }
 
-const isMedia = (path: string) => IMAGE_EXTENSIONS.has(fileExtension(path)) || VIDEO_EXTENSIONS.has(fileExtension(path));
-
 /** Pure tree policy. Adapters provide paths and a metadata reader, never file payloads. */
 export function planScan(
   root: string,
@@ -31,7 +29,8 @@ export function planScan(
     .map(path => ({ path, ...readEntry(path) })).sort((a, b) => a.path.localeCompare(b.path));
   const top = entries.filter(entry => !entry.path.includes("/"));
   const dirs = top.filter(entry => entry.kind === "dir");
-  const rootAssets = top.some(entry => entry.kind === "file" && isMedia(entry.path));
+  const rootAssets = top.some(entry => entry.kind === "file" &&
+    (IMAGE_EXTENSIONS.has(fileExtension(entry.path)) || VIDEO_EXTENSIONS.has(fileExtension(entry.path))));
   const mode = !forceFlat && (dirs.some(entry => entry.path === "default" || isKnownLocale(entry.path, config)) || (dirs.length > 0 && !rootAssets)) ? "locale" : "flat";
   const locales: PlannedLocale[] = [];
   const diagnostics: Finding[] = [];

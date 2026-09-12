@@ -123,6 +123,10 @@ The light `primary` is deep phosphor cyan (OKLCH approximately L 0.53 C 0.10 h 2
 
 Menlo is the system mono used by the CLI and declared here without a web-font request. `title-1` names the selected fixture, `headline` names the workspace sections, `body` carries instructions, and `code` carries evidence. Each region uses at most three roles. Fluid CSS may reduce titles with rem floors but never below the role's readable equivalent.
 
+The web system-monospace stack is `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`.
+The CSS uses this explicit stack because the current exporter classifies Menlo
+as a proportional family; generated token files remain untouched.
+
 ## Layout
 
 A 12-column, 75rem workspace uses five columns for input and seven for inspection. The vertical divider is one `line`; internal groups use spacing rather than nested cards. At 48rem the panes stack input before results. At 320 CSS pixels every matrix row becomes a label-value list with no horizontal page scroll.
@@ -141,7 +145,7 @@ All radii are zero to preserve the CLI crop-frame identity. Native file controls
 | --- | --- | --- |
 | button-primary | choose files | filled once in the input rail |
 | button-secondary | preloaded fixture | selected state uses `primary-surface` plus text |
-| field | hidden file and folder inputs | native semantics, visually routed through labels |
+| field | hidden file and folder inputs | native file selection opened by visibly focusable buttons |
 | card | result workspace | one outer surface only |
 | list-row | fixture choice and file summary | direct labels, no metadata pills |
 | sheet | drag target | dashed line and crop marks, no nested surface |
@@ -166,7 +170,7 @@ The crop-frame draw and one-row scan use `duration-base` with `ease-entrance`; h
 - `validation` — designed: unreadable or unsupported files produce `screenshot-format` or `preview-format`.
 - `permission` — designed: folder reads rejected by the browser surface as an interruption message.
 - `offline/retry` — designed: static app remains usable once loaded; no retry control because inspection is local.
-- `success` — designed: PASS word and `No enabled rules failed`.
+- `success` — verified: PASS, PASS WITH WARNINGS, and FAIL are distinct words; unavailable metadata is disclosed separately.
 - `selected` — designed: fixture button uses `primary-surface`, a left rule, and `aria-pressed`.
 - `destructive-confirm` — N/A: clearing local in-memory results is reversible and has no server effect.
 - `interrupted` — designed: a newer selection supersedes an older read and the latest filename wins.
@@ -201,4 +205,10 @@ Inherits tcv-web anti-patterns.
 | valid-size | browser screenshot of `/?fixture=valid-size` at 390x844, light/dark/200% | PASS result fits without page-level horizontal scroll |
 | wrong-locale | browser screenshot of `/?fixture=wrong-locale` at 1280x800, light/dark/200% | WARN row names `screenshot-unknown-locale` and `en_US` |
 
-Last verified: 2026-09-10 against `https://screenproof.vercel.app` · receipts `receipts/live-*.png` · `designmd audit` count: 0.
+Last verified: 2026-09-12 against a local Vite production preview, not the deployed site.
+Light/dark desktop (1280×800), mobile (375×812), native Chrome 200% zoom, keyboard
+choosers, JSON export/reset, simulated read failures and stale drops, and offline
+real-media inspection were exercised. Receipts:
+`/Volumes/Extreme Pro/Documents/Work/_receipts/2026-09-12/screenproof/`.
+`designmd lint`: 0 errors, 0 warnings; `designmd audit src --design DESIGN.md --strict`: 0 literals bypass tokens.
+An actual screen-reader session and Safari/Firefox verification were not performed.
