@@ -46,6 +46,7 @@ export type {
   ParseResult,
   Platform,
   PreviewAudioTrack,
+  PreviewAudioCodec,
   PreviewFile,
   PreviewInfo,
   PreviewParseResult,

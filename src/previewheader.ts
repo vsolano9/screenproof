@@ -20,7 +20,7 @@
  */
 
 
-import type { AvcConfig, PreviewAudioTrack, PreviewParseResult } from "./types.ts";
+import type { AvcConfig, PreviewAudioCodec, PreviewAudioTrack, PreviewParseResult } from "./types.ts";
 
 
 interface Atom {
@@ -28,6 +28,39 @@ interface Atom {
   dataStart: number;
   end: number;
 }
+
+interface Descriptor {
+  tag: number;
+  dataStart: number;
+  end: number;
+}
+
+const AUDIO_CODEC_BY_OBJECT_TYPE: Readonly<Record<number, PreviewAudioCodec>> = {
+  0x40: "aac",
+  0x66: "aac",
+  0x67: "aac",
+  0x68: "aac",
+  0x69: "mp3",
+  0x6b: "mp3",
+};
+
+const PCM_FOURCCS: Readonly<Record<string, true>> = {
+  "lpcm": true,
+  "sowt": true,
+  "twos": true,
+  "raw ": true,
+  "in24": true,
+  "in32": true,
+  "fl32": true,
+  "fl64": true,
+};
+
+const PCM_BIT_DEPTH_BY_FOURCC: Readonly<Record<string, number>> = {
+  "in24": 24,
+  "in32": 32,
+  "fl32": 32,
+  "fl64": 64,
+};
 
 function u32(bytes: Uint8Array, offset: number): number {
   return (
@@ -139,6 +172,99 @@ function sampleEntries(bytes: Uint8Array, trak: Atom): Atom[] {
   return entries;
 }
 
+function descriptorAt(bytes: Uint8Array, offset: number, end: number): Descriptor {
+  if (offset >= end) throw new Error("truncated MPEG-4 descriptor tag");
+  const tag = bytes[offset]!;
+  let cursor = offset + 1;
+  let length = 0;
+  let terminated = false;
+  for (let count = 0; count < 4; count++) {
+    if (cursor >= end) throw new Error("truncated MPEG-4 descriptor length");
+    const value = bytes[cursor++]!;
+    length = (length * 0x80) + (value & 0x7f);
+    if ((value & 0x80) === 0) {
+      terminated = true;
+      break;
+    }
+  }
+  if (!terminated) throw new Error("invalid MPEG-4 descriptor length");
+  const descriptorEnd = cursor + length;
+  if (descriptorEnd > end) throw new Error("MPEG-4 descriptor exceeds esds bounds");
+  return { tag, dataStart: cursor, end: descriptorEnd };
+}
+
+function decoderObjectType(bytes: Uint8Array, esds: Atom): number | null {
+  if (esds.dataStart + 4 >= esds.end) return null;
+  const top = descriptorAt(bytes, esds.dataStart + 4, esds.end);
+  if (top.tag === 0x04) {
+    return top.dataStart < top.end ? bytes[top.dataStart]! : null;
+  }
+  if (top.tag !== 0x03 || top.dataStart + 3 > top.end) return null;
+
+  const flags = bytes[top.dataStart + 2]!;
+  let cursor = top.dataStart + 3;
+  if ((flags & 0x80) !== 0) cursor += 2;
+  if ((flags & 0x40) !== 0) {
+    if (cursor >= top.end) throw new Error("truncated ES descriptor URL length");
+    cursor += 1 + bytes[cursor]!;
+  }
+  if ((flags & 0x20) !== 0) cursor += 2;
+  if (cursor > top.end) throw new Error("ES descriptor flags exceed descriptor bounds");
+
+  while (cursor < top.end) {
+    const nested = descriptorAt(bytes, cursor, top.end);
+    if (nested.tag === 0x04) {
+      return nested.dataStart < nested.end ? bytes[nested.dataStart]! : null;
+    }
+    cursor = nested.end;
+  }
+  return null;
+}
+
+function audioExtensionAtoms(
+  bytes: Uint8Array,
+  entry: Atom,
+  version: number,
+): Atom[] {
+  let extensionStart: number;
+  if (version === 0) {
+    extensionStart = entry.dataStart + 28;
+  } else if (version === 1) {
+    extensionStart = entry.dataStart + 44;
+  } else if (version === 2) {
+    if (entry.dataStart + 64 > entry.end) return [];
+    const structSize = u32(bytes, entry.dataStart + 28);
+    if (structSize < 72) throw new Error("version 2 audio sample description has an invalid structure size");
+    extensionStart = entry.dataStart + structSize - 8;
+  } else {
+    return [];
+  }
+  if (extensionStart > entry.end) {
+    throw new Error(`version ${version} audio sample description exceeds entry bounds`);
+  }
+  return extensionStart === entry.end ? [] : atoms(bytes, extensionStart, entry.end);
+}
+
+function audioCodec(
+  bytes: Uint8Array,
+  entry: Atom,
+  version: number,
+): PreviewAudioCodec {
+  if (Object.hasOwn(PCM_FOURCCS, entry.type)) return "pcm";
+  if (entry.type === ".mp3" || entry.type === "mp3 ") return "mp3";
+  if (entry.type !== "mp4a") return "unknown";
+
+  const extensions = audioExtensionAtoms(bytes, entry, version);
+  let esds = extensions.find((box) => box.type === "esds");
+  if (!esds) {
+    const wave = extensions.find((box) => box.type === "wave");
+    if (wave) esds = atoms(bytes, wave.dataStart, wave.end).find((box) => box.type === "esds");
+  }
+  if (!esds) return "unknown";
+  const objectType = decoderObjectType(bytes, esds);
+  return objectType === null ? "unknown" : (AUDIO_CODEC_BY_OBJECT_TYPE[objectType] ?? "unknown");
+}
+
 /** `track_enabled` is bit 0 of the `tkhd` flags, the low 24 bits of the full-box header. */
 function trackEnabled(bytes: Uint8Array, trak: Atom): boolean {
   const tkhd = child(trak, bytes, "tkhd");
@@ -211,40 +337,67 @@ function avcConfig(bytes: Uint8Array, entry: Atom): AvcConfig | null {
 /**
  * One audio track's configuration from its sample entry.
  *
- * Version 0 and 1 sound descriptions carry the channel count, sample size, and
- * a 16.16 sample rate in the fixed header. Version 2 replaces them with a
- * struct holding a float64 sample rate and a 32-bit channel count, which is
- * what QuickTime writes for high-rate or multichannel PCM.
+ * Versions 0 and 1 use fixed channel/rate fields. Version 2 replaces them
+ * with an ASBD-style structure and supplies constant PCM depth and format
+ * flags. `mp4a` codec identity comes from its bounded `esds` descriptor.
  */
 function audioTrackInfo(bytes: Uint8Array, trak: Atom): PreviewAudioTrack | null {
   const entry = sampleEntries(bytes, trak)[0];
   if (!entry) return null;
   const enabled = trackEnabled(bytes, trak);
-  if (entry.dataStart + 28 > entry.end) {
-    return { codecFourCC: entry.type, channelCount: 0, sampleRateHz: 0, bitDepth: 0, enabled };
-  }
-
-  const version = u16(bytes, entry.dataStart + 8);
-  if (version === 2) {
-    if (entry.dataStart + 44 > entry.end) {
-      return { codecFourCC: entry.type, channelCount: 0, sampleRateHz: 0, bitDepth: 0, enabled };
-    }
-    const view = new DataView(bytes.buffer, bytes.byteOffset + entry.dataStart + 32, 12);
+  if (entry.dataStart + 10 > entry.end) {
     return {
       codecFourCC: entry.type,
-      channelCount: view.getUint32(8),
-      sampleRateHz: Math.round(view.getFloat64(0)),
-      // Version 2 moves bit depth into the format-specific flags; the fixed
-      // header no longer carries a usable sample size.
-      bitDepth: 0,
+      codec: Object.hasOwn(PCM_FOURCCS, entry.type) ? "pcm" : "unknown",
+      channelCount: 0,
+      sampleRateHz: 0,
+      bitDepth: PCM_BIT_DEPTH_BY_FOURCC[entry.type] ?? null,
       enabled,
     };
   }
 
+  const version = u16(bytes, entry.dataStart + 8);
+  const codec = audioCodec(bytes, entry, version);
+  if (version === 2) {
+    if (entry.dataStart + 64 > entry.end) {
+      return {
+        codecFourCC: entry.type,
+        codec,
+        channelCount: 0,
+        sampleRateHz: 0,
+        bitDepth: PCM_BIT_DEPTH_BY_FOURCC[entry.type] ?? null,
+        enabled,
+      };
+    }
+    const view = new DataView(bytes.buffer, bytes.byteOffset + entry.dataStart + 32, 32);
+    const bitDepth = PCM_BIT_DEPTH_BY_FOURCC[entry.type] ?? view.getUint32(16);
+    return {
+      codecFourCC: entry.type,
+      codec,
+      channelCount: view.getUint32(8),
+      sampleRateHz: Math.round(view.getFloat64(0)),
+      bitDepth: codec === "pcm" && bitDepth > 0 ? bitDepth : null,
+      pcmFormatFlags: view.getUint32(20),
+      enabled,
+    };
+  }
+
+  if (entry.dataStart + 28 > entry.end) {
+    return {
+      codecFourCC: entry.type,
+      codec,
+      channelCount: 0,
+      sampleRateHz: 0,
+      bitDepth: PCM_BIT_DEPTH_BY_FOURCC[entry.type] ?? null,
+      enabled,
+    };
+  }
+  const declaredBitDepth = PCM_BIT_DEPTH_BY_FOURCC[entry.type] ?? u16(bytes, entry.dataStart + 18);
   return {
     codecFourCC: entry.type,
+    codec,
     channelCount: u16(bytes, entry.dataStart + 16),
-    bitDepth: u16(bytes, entry.dataStart + 18),
+    bitDepth: codec === "pcm" && declaredBitDepth > 0 ? declaredBitDepth : null,
     sampleRateHz: u16(bytes, entry.dataStart + 24),
     enabled,
   };
