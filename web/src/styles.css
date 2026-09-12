@@ -35,7 +35,6 @@ a:hover {
 
 button:focus-visible,
 a:focus-visible,
-label:focus-within,
 .drop-zone:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: var(--space-1);
@@ -233,13 +232,6 @@ label:focus-within,
   margin-top: var(--space-4);
 }
 
-.chooser-row input {
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  position: absolute;
-  width: 1px;
-}
 
 .button,
 .fixture-button {
@@ -299,7 +291,7 @@ label:focus-within,
 }
 
 .fixture-button:disabled,
-.button:has(+ input:disabled) {
+.button:disabled {
   cursor: wait;
   opacity: 0.5;
 }
@@ -413,6 +405,15 @@ label:focus-within,
 
 .verdict.is-pass .verdict-lockup strong {
   color: var(--color-success);
+}
+
+.verdict.is-pass-with-warnings .verdict-lockup strong {
+  color: var(--color-warning);
+}
+
+.recovery-note {
+  font-size: var(--text-small-size);
+  line-height: var(--text-small-leading);
 }
 
 .matrix-wrap {
