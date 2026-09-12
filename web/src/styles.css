@@ -222,13 +222,6 @@ main {
   isolation: isolate;
   overflow: hidden;
 }
-.hero:before {
-  content: "";
-  position: absolute;
-  z-index: -2;
-  inset: 0 -30px;
-  background: radial-gradient(ellipse at 77% 100%, #e8f0ff, transparent 66%);
-}
 .hero-copy {
   position: relative;
   z-index: 1;
