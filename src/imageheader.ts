@@ -53,7 +53,7 @@ const PNG_BIT_DEPTHS_BY_COLOR_TYPE: Readonly<Record<number, readonly number[]>> 
   6: [8, 16],
 };
 
-function parsePng(buf: Uint8Array): ParseResult {
+function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
   // Signature (8) + length (4) + "IHDR" (4) + data (13) + CRC (4) = 33.
   if (buf.length < 33) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
   if (readU32BE(buf, 8) !== 13) {
@@ -94,8 +94,14 @@ function parsePng(buf: Uint8Array): ParseResult {
       return { ok: false, reason: "corrupt PNG: chunk length exceeds PNG limit" };
     }
     const chunkEnd = offset + 12 + length;
-    if (chunkEnd > buf.length) {
+    if (chunkEnd > sizeBytes) {
       return { ok: false, reason: "truncated PNG (chunk exceeds file bounds)" };
+    }
+    const isImageData = chunkTypeEquals(buf, offset + 4, "IDAT");
+    const isImageEnd = chunkTypeEquals(buf, offset + 4, "IEND");
+    if (isImageData || isImageEnd) break;
+    if (chunkEnd > buf.length) {
+      return { ok: false, reason: "truncated PNG (chunk is outside the loaded header)" };
     }
     if (chunkTypeEquals(buf, offset + 4, "tRNS")) {
       if (colorType === 3) {
@@ -105,9 +111,6 @@ function parsePng(buf: Uint8Array): ParseResult {
         // Grayscale and truecolor tRNS chunks identify one transparent sample.
         hasAlpha = true;
       }
-      break;
-    }
-    if (chunkTypeEquals(buf, offset + 4, "IDAT") || chunkTypeEquals(buf, offset + 4, "IEND")) {
       break;
     }
     offset = chunkEnd;
@@ -175,9 +178,12 @@ function parseJpeg(buf: Uint8Array): ParseResult {
   }
 }
 
-/** Parse a PNG or JPEG header from raw file bytes. */
-export function parseImageHeader(buf: Uint8Array): ParseResult {
-  if (isPng(buf)) return parsePng(buf);
+/**
+ * Parse a PNG or JPEG header from raw bytes. `sizeBytes` is the original file
+ * size when `buf` is a bounded prefix, allowing PNG parsing to stop at IDAT.
+ */
+export function parseImageHeader(buf: Uint8Array, sizeBytes = buf.length): ParseResult {
+  if (isPng(buf)) return parsePng(buf, sizeBytes);
   if (isJpeg(buf)) return parseJpeg(buf);
   return { ok: false, reason: "not a PNG or JPEG file" };
 }
