@@ -31,7 +31,7 @@
         "height": 1320
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -61,7 +61,7 @@
         "height": 1242
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -91,7 +91,7 @@
         "height": 1206
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -129,7 +129,7 @@
         "height": 1080
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -151,7 +151,7 @@
         "height": 1242
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -173,7 +173,7 @@
         "height": 750
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -203,7 +203,7 @@
         "height": 640
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -233,7 +233,7 @@
         "height": 640
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -263,7 +263,7 @@
         "height": 2048
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -285,7 +285,7 @@
         "height": 2048
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -331,7 +331,7 @@
         "height": 1640
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -353,7 +353,7 @@
         "height": 1668
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -399,7 +399,7 @@
         "height": 768
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -428,7 +428,7 @@
         "height": 1800
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -449,7 +449,7 @@
         "height": 2160
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -466,7 +466,7 @@
         "height": 2160
       }
     ],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -474,7 +474,7 @@
   },
   {
     "id": "watch-ultra3",
-    "label": "Apple Watch Ultra 3",
+    "label": "Apple Watch Ultra 4/Ultra 3",
     "platform": "watch",
     "portrait": [
       {
@@ -483,7 +483,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -491,7 +491,7 @@
   },
   {
     "id": "watch-ultra",
-    "label": "Apple Watch Ultra/Ultra 2",
+    "label": "Apple Watch Ultra 2/Ultra",
     "platform": "watch",
     "portrait": [
       {
@@ -500,7 +500,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -508,7 +508,7 @@
   },
   {
     "id": "watch-s10",
-    "label": "Apple Watch Series 10/11",
+    "label": "Apple Watch Series 12/11/10",
     "platform": "watch",
     "portrait": [
       {
@@ -517,7 +517,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -525,7 +525,7 @@
   },
   {
     "id": "watch-s7",
-    "label": "Apple Watch Series 7/8/9",
+    "label": "Apple Watch Series 9/8/7",
     "platform": "watch",
     "portrait": [
       {
@@ -534,7 +534,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -542,7 +542,7 @@
   },
   {
     "id": "watch-s4",
-    "label": "Apple Watch Series 4/5/6/SE",
+    "label": "Apple Watch Series 6/5/4/SE 3/SE 2/SE",
     "platform": "watch",
     "portrait": [
       {
@@ -551,7 +551,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"
@@ -559,7 +559,7 @@
   },
   {
     "id": "watch-s3",
-    "label": "Apple Watch Series 3",
+    "label": "Apple Watch Series 3/2/1",
     "platform": "watch",
     "portrait": [
       {
@@ -568,7 +568,7 @@
       }
     ],
     "landscape": [],
-    "verifiedOn": "2026-08-23",
+    "verifiedOn": "2026-09-12",
     "sources": [
       "apple",
       "deliver"

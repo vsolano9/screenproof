@@ -168,3 +168,101 @@ test("rejects an illegal PNG color type", () => {
   const reason = expectFail(png);
   assert.match(reason, /invalid color type/);
 });
+
+test("rejects PNG bit depths that are illegal for the IHDR color type", () => {
+  const cases = [
+    { colorType: 0, bitDepth: 3 },
+    { colorType: 2, bitDepth: 4 },
+    { colorType: 3, bitDepth: 16 },
+    { colorType: 4, bitDepth: 4 },
+    { colorType: 6, bitDepth: 1 },
+  ];
+  for (const { colorType, bitDepth } of cases) {
+    const png = Uint8Array.from(makePng(10, 10));
+    png[24] = bitDepth;
+    png[25] = colorType;
+    const reason = expectFail(png);
+    assert.match(reason, new RegExp(`invalid bit depth ${bitDepth} for color type ${colorType}`));
+  }
+});
+test("accepts every legal PNG IHDR bit-depth and color-type combination", () => {
+  const combinations: readonly [number, readonly number[]][] = [
+    [0, [1, 2, 4, 8, 16]],
+    [2, [8, 16]],
+    [3, [1, 2, 4, 8]],
+    [4, [8, 16]],
+    [6, [8, 16]],
+  ];
+  for (const [colorType, bitDepths] of combinations) {
+    for (const bitDepth of bitDepths) {
+      const png = Uint8Array.from(makePng(10, 10));
+      png[24] = bitDepth;
+      png[25] = colorType;
+      expectOk(png);
+    }
+  }
+});
+
+test("rejects a JPEG whose frame segment exceeds the file bounds", () => {
+  const jpeg = Uint8Array.from(makeJpeg(1320, 2868).slice(0, 11));
+  jpeg[4] = 0xff;
+  jpeg[5] = 0xff;
+  assert.match(expectFail(jpeg), /frame segment exceeds file bounds/);
+});
+
+test("rejects JPEG frame headers without a complete component table", () => {
+  const missingCount = Uint8Array.from(makeJpeg(100, 100));
+  missingCount[4] = 0x00;
+  missingCount[5] = 0x07;
+  assert.match(expectFail(missingCount), /component count/);
+
+  const missingTable = Uint8Array.from(makeJpeg(100, 100));
+  missingTable[11] = 0x02;
+  assert.match(expectFail(missingTable), /component table/);
+});
+
+test("rejects unsupported lossless and differential JPEG frame variants", () => {
+  for (const marker of [0xc3, 0xc7, 0xcb, 0xcf]) {
+    const jpeg = Uint8Array.from(makeJpeg(100, 100));
+    jpeg[3] = marker;
+    assert.match(expectFail(jpeg), /unsupported JPEG frame type/);
+  }
+});
+
+test("bounded PNG parsing can stop before a valid IDAT payload", () => {
+  const prefix = Uint8Array.from(makePng(100, 50).slice(0, 41));
+  prefix.set(new Uint8Array([0x00, 0x0f, 0x42, 0x40]), 33);
+  const result = parseImageHeader(prefix, 1_000_045);
+  assert.equal(result.ok, true, result.ok ? undefined : result.reason);
+  if (result.ok) assert.equal(result.info.hasAlpha, false);
+});
+
+test("bounded PNG parsing still requires pre-IDAT transparency chunks", () => {
+  const prefix = makePng(100, 50, { colorType: 3, transparency: true }).slice(0, 56);
+  assert.match(expectFail(prefix), /truncated PNG/);
+  const result = parseImageHeader(prefix, 1_000_000);
+  assert.equal(result.ok, false);
+  // The file is intact; only the caller's read budget ran out, so transparency
+  // is unproven. Reporting truncation here would misdiagnose a valid file.
+  if (!result.ok) assert.match(result.reason, /exceeds the bounded header read/);
+});
+
+test("an exhausted read budget is not reported as a truncated JPEG", () => {
+  const padded = new Uint8Array(8192);
+  padded.set(makeJpeg(1320, 2868).subarray(0, 2));
+  // An APP1 segment whose declared length runs past the bounded prefix.
+  padded.set(new Uint8Array([0xff, 0xe1, 0x10, 0x02]), 2);
+  const prefix = padded.subarray(0, 64);
+  assert.match(expectFail(prefix), /truncated JPEG/);
+  const bounded = parseImageHeader(prefix, padded.length);
+  assert.equal(bounded.ok, false);
+  if (!bounded.ok) assert.match(bounded.reason, /exceeds the bounded header read/);
+});
+
+test("bounded PNG parsing rejects an IDAT that exceeds the original file", () => {
+  const prefix = Uint8Array.from(makePng(100, 50).slice(0, 41));
+  prefix.set(new Uint8Array([0x00, 0x0f, 0x42, 0x40]), 33);
+  const result = parseImageHeader(prefix, 500_000);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /file bounds/);
+});

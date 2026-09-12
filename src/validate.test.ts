@@ -29,7 +29,7 @@ function badFile(name: string, locale: string, reason: string): ScreenshotFile {
 
 /** One conforming stereo AAC track, so a fixture only states what it breaks. */
 const STEREO_AAC: PreviewAudioTrack[] = [
-  { codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+  { codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: true },
 ];
 
 function preview(
@@ -121,14 +121,23 @@ test("screenshot-format fires on unparseable files", () => {
   assert.match(findings[0]!.message, /cannot parse image header: truncated PNG/);
 });
 
-test("screenshot-png-alpha warns on alpha PNGs", () => {
+test("screenshot-png-alpha errors on any declared PNG transparency by default", () => {
   const scan = scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736, true), png("02.png", "en-US", 1260, 2736)])]);
   const report = validate(scan, defaultConfig());
   const findings = byRule(report, "screenshot-png-alpha");
   assert.equal(findings.length, 1);
-  assert.equal(findings[0]!.severity, "warning");
+  assert.equal(findings[0]!.severity, "error");
   assert.equal(findings[0]!.file, "01.png");
-  assert.match(findings[0]!.message, /declares transparency/);
+  assert.match(findings[0]!.message, /PNG alpha channels and transparency are not allowed/);
+  assert.equal(report.ok, false);
+});
+
+test("screenshot-png-alpha severity overrides remain effective", () => {
+  const scan = scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736, true)])]);
+  const warning = validate(scan, rules({ "screenshot-png-alpha": "warning" }));
+  assert.equal(byRule(warning, "screenshot-png-alpha")[0]!.severity, "warning");
+  assert.equal(warning.ok, true);
+  assert.deepEqual(byRule(validate(scan, rules({ "screenshot-png-alpha": "off" })), "screenshot-png-alpha"), []);
 });
 
 test("screenshot-unknown-dimensions errors with a nearest-size suggestion", () => {
@@ -160,6 +169,17 @@ test("screenshot-count-over combines orientations within a class", () => {
 
   const ten = eleven.slice(0, 10);
   assert.equal(byRule(validate(scanResult([localeScan("en-US", ten)]), defaultConfig()), "screenshot-count-over").length, 0);
+});
+
+test("screenshot-count-over keeps fastlane near-miss iPad filenames in the 13-inch bucket", () => {
+  const files = [
+    ...Array.from({ length: 6 }, (_, i) => png(`ipad_pro_129-${i}.png`, "en-US", 2048, 2732)),
+    ...Array.from({ length: 6 }, (_, i) => png(`plain-${i}.png`, "en-US", 2048, 2732)),
+  ];
+  const report = validate(scanResult([localeScan("en-US", files)]), defaultConfig());
+  const findings = byRule(report, "screenshot-count-over");
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /12 screenshots for iPad 13-inch/);
 });
 
 test("unknown-dimension files do not count toward the class limit", () => {
@@ -331,8 +351,8 @@ test("report assembly: counts, ok flags, deterministic order, mode copied", () =
   ]);
   const report = validate(scan, defaultConfig());
   assert.equal(report.mode, "locale");
-  assert.equal(report.errorCount, 1);
-  assert.equal(report.warningCount, 2);
+  assert.equal(report.errorCount, 2);
+  assert.equal(report.warningCount, 1);
   assert.equal(report.infoCount, 0);
   assert.equal(report.ok, false);
   assert.deepEqual(report.locales.map((l) => l.locale), ["de-DE", "en-US"]);
@@ -341,6 +361,18 @@ test("report assembly: counts, ok flags, deterministic order, mode copied", () =
   const enUs = report.locales[1]!.findings;
   assert.deepEqual(enUs.map((f) => f.rule), ["screenshot-png-alpha", "screenshot-unknown-dimensions"]);
   assert.equal(report.findings.length, 3);
+});
+
+test("report gate distinguishes clean, warning, error, and strict-warning results", () => {
+  const clean = validate(scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736)])]), defaultConfig());
+  assert.equal(clean.gate, "pass");
+
+  const warningScan = scanResult([localeScan("en_US", [png("01.png", "en_US", 1260, 2736)], { known: false })]);
+  assert.equal(validate(warningScan, defaultConfig()).gate, "pass-with-warnings");
+  assert.equal(validate(warningScan, defaultConfig(), { strict: true }).gate, "fail");
+
+  const errorScan = scanResult([localeScan("en-US", [png("bad.png", "en-US", 500, 500)])]);
+  assert.equal(validate(errorScan, defaultConfig()).gate, "fail");
 });
 
 test("flat mode runs file-level checks only: no count, primary, or locale-empty rules", () => {
@@ -516,6 +548,27 @@ test("a preview with no avcC is not judged on profile", () => {
   assert.deepEqual(byRule(report, "preview-h264-profile"), []);
 });
 
+test("unknown preview metadata is listed as unverified rather than silently passed", () => {
+  const previews = [preview("unknown.mp4", "en-US", 20, 886, 1920, {
+    frameRate: null,
+    avc: null,
+    audioTracks: [{
+      codecFourCC: "mp4a",
+      codec: "unknown",
+      channelCount: 2,
+      sampleRateHz: 44_100,
+      bitDepth: null,
+      enabled: true,
+    }],
+  })];
+  const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
+  assert.deepEqual(report.unverifiedChecks.map((check) => check.check), [
+    "preview-frame-rate",
+    "preview-h264-profile",
+    "preview-audio-codec",
+  ]);
+});
+
 test("a silent app preview is reported once, not as a layout problem", () => {
   const previews = [preview("silent.mp4", "en-US", 20, 886, 1920, { audioTracks: [] })];
   const report = validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig());
@@ -526,10 +579,12 @@ test("a silent app preview is reported once, not as a layout problem", () => {
 });
 
 test("stereo is accepted as one 2-channel track or two 1-channel tracks", () => {
-  const oneTrack = [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
-  const twoTracks = [
-    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
-    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+  const oneTrack: PreviewAudioTrack[] = [
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: true },
+  ];
+  const twoTracks: PreviewAudioTrack[] = [
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 1, sampleRateHz: 44_100, bitDepth: null, enabled: true },
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 1, sampleRateHz: 44_100, bitDepth: null, enabled: true },
   ];
   for (const audioTracks of [oneTrack, twoTracks]) {
     const previews = [preview("a.mp4", "en-US", 20, 886, 1920, { audioTracks })];
@@ -539,8 +594,12 @@ test("stereo is accepted as one 2-channel track or two 1-channel tracks", () => 
 });
 
 test("mono and surround audio are rejected as not stereo", () => {
-  const mono = [{ codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
-  const surround = [{ codecFourCC: "mp4a", channelCount: 6, sampleRateHz: 48_000, bitDepth: 16, enabled: true }];
+  const mono: PreviewAudioTrack[] = [
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 1, sampleRateHz: 44_100, bitDepth: null, enabled: true },
+  ];
+  const surround: PreviewAudioTrack[] = [
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 6, sampleRateHz: 48_000, bitDepth: null, enabled: true },
+  ];
   const previews = [
     preview("mono.mp4", "en-US", 20, 886, 1920, { audioTracks: mono }),
     preview("surround.mp4", "en-US", 20, 886, 1920, { audioTracks: surround }),
@@ -554,7 +613,9 @@ test("mono and surround audio are rejected as not stereo", () => {
 });
 
 test("PCM audio is accepted with ProRes and rejected with H.264", () => {
-  const pcm = [{ codecFourCC: "sowt", channelCount: 2, sampleRateHz: 48_000, bitDepth: 24, enabled: true }];
+  const pcm: PreviewAudioTrack[] = [
+    { codecFourCC: "sowt", codec: "pcm", channelCount: 2, sampleRateHz: 48_000, bitDepth: 24, enabled: true },
+  ];
   const previews = [
     preview("prores.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm }),
     preview("h264.mp4", "en-US", 20, 886, 1920, { codecFourCC: "avc1", audioTracks: pcm }),
@@ -567,19 +628,23 @@ test("PCM audio is accepted with ProRes and rejected with H.264", () => {
   assert.match(findings[0]!.message, /PCM, which Apple accepts only with ProRes 422 HQ/);
 });
 
-test("an audio codec that is neither AAC nor PCM is rejected on any video codec", () => {
-  const mp3 = [{ codecFourCC: ".mp3", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true }];
+test("MP3 audio is rejected even when its container sample entry is mp4a", () => {
+  const mp3: PreviewAudioTrack[] = [
+    { codecFourCC: "mp4a", codec: "mp3", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: true },
+  ];
   const previews = [preview("mp3.mp4", "en-US", 20, 886, 1920, { audioTracks: mp3 })];
   const findings = byRule(
     validate(scanResult([localeScan("en-US", [], { previews })]), defaultConfig()),
     "preview-audio-codec",
   );
   assert.equal(findings.length, 1);
-  assert.match(findings[0]!.message, /\.mp3 is not accepted; use 256 kbps AAC/);
+  assert.match(findings[0]!.message, /MP3 inside sample entry mp4a/);
 });
 
 test("audio sample rate must be 44.1 or 48 kHz", () => {
-  const rate = (hz: number) => [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: hz, bitDepth: 16, enabled: true }];
+  const rate = (hz: number): PreviewAudioTrack[] => [
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: hz, bitDepth: null, enabled: true },
+  ];
   const previews = [
     preview("ok-441.mp4", "en-US", 20, 886, 1920, { audioTracks: rate(44_100) }),
     preview("ok-48.mp4", "en-US", 20, 886, 1920, { audioTracks: rate(48_000) }),
@@ -594,12 +659,14 @@ test("audio sample rate must be 44.1 or 48 kHz", () => {
 });
 
 test("PCM bit depth must be 16, 24, or 32, and is not judged for AAC", () => {
-  const pcm = (bits: number) => [{ codecFourCC: "sowt", channelCount: 2, sampleRateHz: 48_000, bitDepth: bits, enabled: true }];
+  const pcm = (bits: number): PreviewAudioTrack[] => [
+    { codecFourCC: "sowt", codec: "pcm", channelCount: 2, sampleRateHz: 48_000, bitDepth: bits, enabled: true },
+  ];
   const previews = [
     preview("pcm24.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm(24) }),
     preview("pcm8.mov", "en-US", 20, 886, 1920, { codecFourCC: "apch", audioTracks: pcm(8) }),
     preview("aac8.mp4", "en-US", 20, 886, 1920, {
-      audioTracks: [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 8, enabled: true }],
+      audioTracks: [{ codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: true }],
     }),
   ];
   const findings = byRule(
@@ -613,7 +680,7 @@ test("a disabled track warns once per file, for video or audio", () => {
   const previews = [
     preview("novideo.mp4", "en-US", 20, 886, 1920, { videoTrackEnabled: false }),
     preview("noaudio.mp4", "en-US", 20, 886, 1920, {
-      audioTracks: [{ codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: false }],
+      audioTracks: [{ codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: false }],
     }),
   ];
   const findings = byRule(

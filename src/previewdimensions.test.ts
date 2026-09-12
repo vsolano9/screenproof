@@ -11,6 +11,10 @@ import {
   PREVIEW_VERIFIED_ON,
 } from "./previewdimensions.ts";
 
+test("app-preview verification date is recorded", () => {
+  assert.equal(PREVIEW_VERIFIED_ON, "2026-09-12");
+});
+
 test("app-preview sizes match the checked-in Apple snapshot", async () => {
   const raw = await readFile(
     new URL("../fixtures/preview-dimensions-snapshot.json", import.meta.url),

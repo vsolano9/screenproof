@@ -45,8 +45,23 @@ function chunkTypeEquals(buf: Uint8Array, offset: number, type: string): boolean
 
 /** Legal PNG colour types (spec: 0 gray, 2 RGB, 3 palette, 4 gray+alpha, 6 RGBA). */
 const PNG_COLOR_TYPES: ReadonlySet<number> = new Set([0, 2, 3, 4, 6]);
+const PNG_BIT_DEPTHS_BY_COLOR_TYPE: Readonly<Record<number, readonly number[]>> = {
+  0: [1, 2, 4, 8, 16],
+  2: [8, 16],
+  3: [1, 2, 4, 8],
+  4: [8, 16],
+  6: [8, 16],
+};
 
-function parsePng(buf: Uint8Array): ParseResult {
+/**
+ * Callers may pass a bounded prefix of a larger file. A structure that ends
+ * past the loaded bytes but inside the real file exhausted that read budget;
+ * it is not evidence that the file itself is truncated.
+ */
+const PNG_BUDGET = "PNG metadata exceeds the bounded header read; transparency could not be checked";
+const JPEG_BUDGET = "JPEG metadata exceeds the bounded header read; the frame header was not reached";
+
+function parsePng(buf: Uint8Array, sizeBytes: number): ParseResult {
   // Signature (8) + length (4) + "IHDR" (4) + data (13) + CRC (4) = 33.
   if (buf.length < 33) return { ok: false, reason: "truncated PNG (incomplete IHDR)" };
   if (readU32BE(buf, 8) !== 13) {
@@ -71,20 +86,33 @@ function parsePng(buf: Uint8Array): ParseResult {
   if (!PNG_COLOR_TYPES.has(colorType)) {
     return { ok: false, reason: `corrupt PNG: invalid color type ${colorType}` };
   }
+  const bitDepth = buf[24]!;
+  if (!PNG_BIT_DEPTHS_BY_COLOR_TYPE[colorType]!.includes(bitDepth)) {
+    return { ok: false, reason: `corrupt PNG: invalid bit depth ${bitDepth} for color type ${colorType}` };
+  }
 
+  if (buf[26] !== 0) return { ok: false, reason: "invalid PNG compression method" };
+  if (buf[27] !== 0) return { ok: false, reason: "invalid PNG filter method" };
+  if (buf[28] !== 0 && buf[28] !== 1) return { ok: false, reason: "invalid PNG interlace method" };
   let hasAlpha = colorType === 4 || colorType === 6;
   let offset = 33;
   while (!hasAlpha) {
     if (offset + 8 > buf.length) {
-      return { ok: false, reason: "truncated PNG (incomplete chunk header before IDAT)" };
+      return { ok: false, reason: offset + 8 > sizeBytes ? "truncated PNG (incomplete chunk header before IDAT)" : PNG_BUDGET };
     }
     const length = readU32BE(buf, offset);
     if (length > 0x7fffffff) {
       return { ok: false, reason: "corrupt PNG: chunk length exceeds PNG limit" };
     }
     const chunkEnd = offset + 12 + length;
-    if (chunkEnd > buf.length) {
+    if (chunkEnd > sizeBytes) {
       return { ok: false, reason: "truncated PNG (chunk exceeds file bounds)" };
+    }
+    const isImageData = chunkTypeEquals(buf, offset + 4, "IDAT");
+    const isImageEnd = chunkTypeEquals(buf, offset + 4, "IEND");
+    if (isImageData || isImageEnd) break;
+    if (chunkEnd > buf.length) {
+      return { ok: false, reason: PNG_BUDGET };
     }
     if (chunkTypeEquals(buf, offset + 4, "tRNS")) {
       if (colorType === 3) {
@@ -94,9 +122,6 @@ function parsePng(buf: Uint8Array): ParseResult {
         // Grayscale and truecolor tRNS chunks identify one transparent sample.
         hasAlpha = true;
       }
-      break;
-    }
-    if (chunkTypeEquals(buf, offset + 4, "IDAT") || chunkTypeEquals(buf, offset + 4, "IEND")) {
       break;
     }
     offset = chunkEnd;
@@ -110,16 +135,20 @@ function isSofMarker(marker: number): boolean {
   return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
 }
 
-function parseJpeg(buf: Uint8Array): ParseResult {
+function parseJpeg(buf: Uint8Array, sizeBytes: number): ParseResult {
+  const outOfBytes: ParseResult = {
+    ok: false,
+    reason: buf.length < sizeBytes ? JPEG_BUDGET : "truncated JPEG (no frame header)",
+  };
   let i = 2; // past SOI
   while (true) {
-    if (i + 1 >= buf.length) return { ok: false, reason: "truncated JPEG (no frame header)" };
+    if (i + 1 >= buf.length) return outOfBytes;
     if (buf[i] !== 0xff) return { ok: false, reason: "invalid JPEG marker structure" };
 
     // Skip fill bytes: any number of 0xFF may pad before the marker byte.
     let j = i + 1;
     while (j < buf.length && buf[j] === 0xff) j++;
-    if (j >= buf.length) return { ok: false, reason: "truncated JPEG (no frame header)" };
+    if (j >= buf.length) return outOfBytes;
     const marker = buf[j]!;
 
     // Standalone markers without a length field.
@@ -129,16 +158,48 @@ function parseJpeg(buf: Uint8Array): ParseResult {
     }
     if (marker === 0xd9) return { ok: false, reason: "no JPEG frame header found" };
 
-    if (j + 2 >= buf.length) return { ok: false, reason: "truncated JPEG (segment length)" };
+    if (j + 2 >= buf.length) {
+      return { ok: false, reason: j + 2 >= sizeBytes ? "truncated JPEG (segment length)" : JPEG_BUDGET };
+    }
     const segmentLength = readU16BE(buf, j + 1);
     if (segmentLength < 2) return { ok: false, reason: "invalid JPEG segment length" };
 
     if (isSofMarker(marker)) {
+      if (marker !== 0xc0 && marker !== 0xc1 && marker !== 0xc2) {
+        return { ok: false, reason: `unsupported JPEG frame type SOF${marker - 0xc0}` };
+      }
       // Segment layout after the marker: length (2), precision (1),
-      // height (2), width (2). The declared length must cover those five
-      // payload bytes; do not read past what the segment claims to contain.
-      if (segmentLength < 7) return { ok: false, reason: "invalid JPEG frame header length" };
-      if (j + 7 >= buf.length) return { ok: false, reason: "truncated JPEG (frame header)" };
+      // height (2), width (2), component count (1), then 3 bytes per component.
+      if (segmentLength < 8) return { ok: false, reason: "invalid JPEG frame header length: missing component count" };
+      const segmentEnd = j + 1 + segmentLength;
+      if (segmentEnd > buf.length) {
+        return { ok: false, reason: segmentEnd > sizeBytes ? "truncated JPEG (frame segment exceeds file bounds)" : JPEG_BUDGET };
+      }
+      const componentCount = buf[j + 8]!;
+      if (componentCount === 0) {
+        return { ok: false, reason: "invalid JPEG frame header: component count is zero" };
+      }
+      if (segmentLength !== 8 + componentCount * 3) {
+        return { ok: false, reason: "invalid JPEG frame header: incomplete component table" };
+      }
+      const precision = buf[j + 3]!;
+      if (precision !== 8 && !(marker !== 0xc0 && precision === 12)) {
+        return { ok: false, reason: `invalid JPEG precision ${precision} for SOF${marker - 0xc0}` };
+      }
+      const componentIds = new Set<number>();
+      for (let component = 0; component < componentCount; component++) {
+        const offset = j + 9 + component * 3;
+        const id = buf[offset]!;
+        const sampling = buf[offset + 1]!;
+        const horizontal = sampling >>> 4;
+        const vertical = sampling & 0x0f;
+        if (componentIds.has(id)) return { ok: false, reason: "invalid JPEG: duplicate component identifier" };
+        componentIds.add(id);
+        if (horizontal < 1 || horizontal > 4 || vertical < 1 || vertical > 4) {
+          return { ok: false, reason: "invalid JPEG component sampling factors" };
+        }
+        if (buf[offset + 2]! > 3) return { ok: false, reason: "invalid JPEG quantization-table selector" };
+      }
       const height = readU16BE(buf, j + 4);
       const width = readU16BE(buf, j + 6);
       if (width === 0 || height === 0) {
@@ -151,9 +212,13 @@ function parseJpeg(buf: Uint8Array): ParseResult {
   }
 }
 
-/** Parse a PNG or JPEG header from raw file bytes. */
-export function parseImageHeader(buf: Uint8Array): ParseResult {
-  if (isPng(buf)) return parsePng(buf);
-  if (isJpeg(buf)) return parseJpeg(buf);
+/**
+ * Parse a PNG or JPEG header from raw bytes. `sizeBytes` is the original file
+ * size when `buf` is a bounded prefix: PNG parsing stops at IDAT, and both
+ * parsers distinguish a real truncation from an exhausted read budget.
+ */
+export function parseImageHeader(buf: Uint8Array, sizeBytes = buf.length): ParseResult {
+  if (isPng(buf)) return parsePng(buf, sizeBytes);
+  if (isJpeg(buf)) return parseJpeg(buf, sizeBytes);
   return { ok: false, reason: "not a PNG or JPEG file" };
 }

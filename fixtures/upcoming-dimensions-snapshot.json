@@ -1,0 +1,44 @@
+[
+  {
+    "id": "iphone-duo-outer",
+    "label": "iPhone Duo outer display (upcoming)",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 1398,
+        "height": 2034
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2034,
+        "height": 1398
+      }
+    ],
+    "verifiedOn": "2026-09-12",
+    "sources": [
+      "apple"
+    ]
+  },
+  {
+    "id": "iphone-duo-inner",
+    "label": "iPhone Duo inner display (upcoming)",
+    "platform": "iphone",
+    "portrait": [
+      {
+        "width": 2007,
+        "height": 2853
+      }
+    ],
+    "landscape": [
+      {
+        "width": 2853,
+        "height": 2007
+      }
+    ],
+    "verifiedOn": "2026-09-12",
+    "sources": [
+      "apple"
+    ]
+  }
+]

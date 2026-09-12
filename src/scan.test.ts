@@ -229,6 +229,10 @@ test("root images beside non-locale folders keep flat mode", async () => {
 });
 
 test("an unreadable locale folder becomes a screenshot-unreadable diagnostic, not a crash", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("Windows chmod does not enforce POSIX directory read permissions");
+    return;
+  }
   if (typeof process.getuid === "function" && process.getuid() === 0) {
     t.skip("running as root, chmod 000 is not enforced");
     return;
@@ -250,15 +254,23 @@ test("an unreadable locale folder becomes a screenshot-unreadable diagnostic, no
   }
 });
 
-test("symlinked images and locale folders are followed", async () => {
+test("symlinked images and locale folders are followed", async (t) => {
   const root = await tree();
   const assets = await tree();
   await writeFile(join(assets, "real.png"), PNG);
   await mkdir(join(assets, "shared-locale"));
   await writeFile(join(assets, "shared-locale", "01.png"), PNG);
   await mkdir(join(root, "en-US"));
-  await symlink(join(assets, "real.png"), join(root, "en-US", "linked.png"));
-  await symlink(join(assets, "shared-locale"), join(root, "de-DE"));
+  try {
+    await symlink(join(assets, "real.png"), join(root, "en-US", "linked.png"), "file");
+  } catch (error) {
+    if (process.platform === "win32" && ["EPERM", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+      t.skip("This Windows account cannot create file symlinks");
+      return;
+    }
+    throw error;
+  }
+  await symlink(join(assets, "shared-locale"), join(root, "de-DE"), process.platform === "win32" ? "junction" : "dir");
   const result = await scan(root, defaultConfig());
   const en = result.locales.find((l) => l.locale === "en-US");
   assert.ok(en);
@@ -270,12 +282,31 @@ test("symlinked images and locale folders are followed", async () => {
   assert.equal(de.files.length, 1);
 });
 
-test("broken symlinks are recorded as unexpected files", async () => {
+test("broken symlinks are recorded as unexpected files", async (t) => {
   const root = await tree();
   await mkdir(join(root, "en-US"));
   await writeFile(join(root, "en-US", "01.png"), PNG);
-  await symlink(join(root, "gone.png"), join(root, "en-US", "dead.png"));
+  try {
+    await symlink(join(root, "gone.png"), join(root, "en-US", "dead.png"), "file");
+  } catch (error) {
+    if (process.platform === "win32" && ["EPERM", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? "")) {
+      t.skip("This Windows account cannot create file symlinks");
+      return;
+    }
+    throw error;
+  }
   const result = await scan(root, defaultConfig());
   assert.equal(result.locales[0]!.files.length, 1);
   assert.deepEqual(result.locales[0]!.unexpectedFiles, ["dead.png"]);
+});
+
+
+test("linked locale directories work with Windows junctions or POSIX symlinks", async () => {
+  const root = await tree();
+  const assets = await tree();
+  await writeFile(join(assets, "01.png"), PNG);
+  await symlink(assets, join(root, "en-US"), process.platform === "win32" ? "junction" : "dir");
+  const result = await scan(root, defaultConfig());
+  assert.equal(result.locales[0]?.files.length, 1);
+  assert.equal(result.locales[0]?.files[0]?.parse.ok, true);
 });

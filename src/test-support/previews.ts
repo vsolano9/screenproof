@@ -29,6 +29,26 @@ function box(type: string, payload: Uint8Array): Uint8Array {
   return concat([u32(payload.length + 8), text(type), payload]);
 }
 
+function descriptor(tag: number, payload: Uint8Array): Uint8Array {
+  if (payload.length >= 0x80) throw new Error("test descriptor payload is too large");
+  return concat([new Uint8Array([tag, payload.length]), payload]);
+}
+
+function elementaryStreamDescriptor(objectTypeIndication: number, config: Uint8Array | null): Uint8Array {
+  const decoderConfig = descriptor(0x04, concat([
+    new Uint8Array([objectTypeIndication, 0x15]),
+    new Uint8Array(11),
+    ...(config === null ? [] : [descriptor(0x05, config)]),
+  ]));
+  const es = descriptor(0x03, concat([
+    u16(1),
+    new Uint8Array([0]),
+    decoderConfig,
+    descriptor(0x06, new Uint8Array([2])),
+  ]));
+  return box("esds", concat([new Uint8Array(4), es]));
+}
+
 /**
  * A version-0 `tkhd`: version and flags, 20 bytes through the duration, 16
  * bytes of layer and volume fields, the 9-value transform matrix, then
@@ -77,23 +97,50 @@ function visualSampleEntry(codecFourCC: string, avc: AvcSpec | null): Uint8Array
 }
 
 /**
- * A version-0 `AudioSampleEntry`: 8 bytes through the data reference index,
- * then version, revision, and vendor, then channel count, sample size,
- * compression id, packet size, and a 16.16 sample rate.
+ * A versioned QuickTime audio sample entry. Version 0 uses the fixed fields,
+ * version 1 appends packet sizing, and version 2 carries the ASBD-style
+ * constant bit depth and format flags.
  */
 function audioSampleEntry(track: AudioTrackSpec): Uint8Array {
-  return box(track.codecFourCC ?? "mp4a", concat([
-    new Uint8Array(8),
-    u16(0),
-    u16(0),
-    new Uint8Array(4),
-    u16(track.channelCount ?? 2),
-    u16(track.bitDepth ?? 16),
-    u16(0),
-    u16(0),
-    u16(track.sampleRateHz ?? 44_100),
-    u16(0),
-  ]));
+  const codecFourCC = track.codecFourCC ?? "mp4a";
+  const version = track.soundDescriptionVersion ?? 0;
+  let fixed: Uint8Array;
+  if (version === 2) {
+    fixed = new Uint8Array(64);
+    fixed.set(u16(2), 8);
+    fixed.set(u16(3), 16);
+    fixed.set(u16(16), 18);
+    fixed.set(u16(0xfffe), 20);
+    fixed.set(u32(0x00010000), 24);
+    fixed.set(u32(72), 28);
+    const view = new DataView(fixed.buffer);
+    view.setFloat64(32, track.sampleRateHz ?? 44_100);
+    view.setUint32(40, track.channelCount ?? 2);
+    view.setUint32(44, 0x7f000000);
+    view.setUint32(48, track.bitDepth ?? 16);
+    view.setUint32(52, track.formatSpecificFlags ?? 0);
+    view.setUint32(56, (track.channelCount ?? 2) * Math.ceil((track.bitDepth ?? 16) / 8));
+    view.setUint32(60, 1);
+  } else {
+    fixed = concat([
+      new Uint8Array(8),
+      u16(version),
+      u16(0),
+      new Uint8Array(4),
+      u16(track.channelCount ?? 2),
+      u16(track.bitDepth ?? 16),
+      u16(0),
+      u16(0),
+      u16(track.sampleRateHz ?? 44_100),
+      u16(0),
+      ...(version === 1 ? [new Uint8Array(16)] : []),
+    ]);
+  }
+  const objectType = track.objectTypeIndication === undefined ? 0x40 : track.objectTypeIndication;
+  const extensions = codecFourCC === "mp4a" && objectType !== null
+    ? elementaryStreamDescriptor(objectType, track.audioSpecificConfig === undefined ? new Uint8Array([0x12, 0x10]) : track.audioSpecificConfig)
+    : new Uint8Array(0);
+  return box(codecFourCC, concat([fixed, extensions]));
 }
 
 function sampleDescription(entries: Uint8Array[]): Uint8Array {
@@ -106,13 +153,20 @@ export interface AvcSpec {
 }
 
 export interface AudioTrackSpec {
-  /** Sample-entry FourCC. `mp4a` is AAC; `lpcm`, `sowt`, and `twos` are PCM. */
+  /** Sample-entry FourCC. Actual `mp4a` codec identity comes from `esds`. */
   codecFourCC?: string;
   channelCount?: number;
   sampleRateHz?: number;
-  /** Declared sample size in bits. Only meaningful for PCM. */
+  /** Declared PCM sample size in bits. */
   bitDepth?: number;
   enabled?: boolean;
+  soundDescriptionVersion?: 0 | 1 | 2;
+  /** MPEG-4 DecoderConfigDescriptor object type; null omits `esds`. */
+  objectTypeIndication?: number | null;
+  /** DecoderSpecificInfo; null omits it, undefined writes AAC-LC stereo. */
+  audioSpecificConfig?: Uint8Array | null;
+  /** Version-2 Core Audio format flags. */
+  formatSpecificFlags?: number;
 }
 
 export interface PreviewSpec {

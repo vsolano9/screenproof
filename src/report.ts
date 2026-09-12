@@ -40,15 +40,15 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   const color = options.color ?? false;
   const quiet = options.quiet ?? false;
   const lines: string[] = [];
+  const visibleFinding = (finding: LintReport["findings"][number]): boolean =>
+    !quiet || finding.severity !== "info";
 
   const modeSuffix = report.mode === "flat" ? "  (flat mode)" : "";
   lines.push(paint(`screenproof  ${report.root}${modeSuffix}`, "muted", color));
   lines.push("");
 
   for (const locale of report.locales) {
-    const visible = quiet
-      ? locale.findings.filter((f) => f.severity !== "info")
-      : locale.findings;
+    const visible = locale.findings.filter(visibleFinding);
     if (quiet && visible.length === 0) continue;
 
     const label = locale.locale === "" ? "." : locale.locale;
@@ -70,7 +70,9 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   // root files). In flat mode "" is a real locale section above. The glyph
   // tracks severity; ✖ is reserved for errors.
   const reportLevel =
-    report.mode === "locale" ? report.findings.filter((f) => f.locale === "") : [];
+    report.mode === "locale"
+      ? report.findings.filter((finding) => finding.locale === "" && visibleFinding(finding))
+      : [];
   for (const finding of reportLevel) {
     const sev = paint(finding.severity.padEnd(7), finding.severity, color);
     const glyph =
@@ -81,8 +83,22 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
     lines.push(`${glyph} ${sev} ${fileLabel.padEnd(24)} ${finding.message}`);
   }
 
+  if (report.unverifiedChecks.length > 0) {
+    lines.push("");
+    lines.push(paint("Unverified checks:", "warning", color));
+    for (const check of report.unverifiedChecks) {
+      const location = [check.locale, check.file].filter(Boolean).join("/");
+      lines.push(`    ? ${location.padEnd(24)} ${check.check}: ${check.reason}`);
+    }
+  }
+
   lines.push("");
-  const verdict = report.ok ? paint("PASS", "success", color) : paint("FAIL", "error", color);
+  const verdict =
+    report.gate === "fail"
+      ? paint("FAIL", "error", color)
+      : report.gate === "pass-with-warnings"
+        ? paint("PASS WITH WARNINGS", "warning", color)
+        : paint("PASS", "success", color);
   lines.push(
     `Summary: ${severityCounts(report)} across ${report.locales.length} locale${report.locales.length === 1 ? "" : "s"} - ${verdict}`,
   );
@@ -90,9 +106,9 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   return lines.join("\n");
 }
 
-/** Process exit code: non-zero on errors, or on warnings when strict. */
+/** Process exit code from the effective gate, with a strict override for callers that compute a non-strict report. */
 export function exitCode(report: LintReport, strict: boolean): number {
-  if (report.errorCount > 0) return 1;
+  if (report.gate === "fail") return 1;
   if (strict && report.warningCount > 0) return 1;
   return 0;
 }

@@ -190,7 +190,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
 
   const path = resolvePath(args.path, io.cwd);
   const scanned = await scan(path, config, { forceFlat: args.flat });
-  const report = validate(scanned, config, { metadataLocales });
+  const report = validate(scanned, config, { metadataLocales, strict: args.strict });
 
   if (args.json) {
     io.write(`${renderJson(report)}\n`);

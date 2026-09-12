@@ -6,6 +6,88 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## 0.7.0 - 2026-09-12
+
+### Added
+
+- A responsive light/blue inspector based on the approved design, with real
+  asset summaries, locale/device filters, search, grouped file findings,
+  distinct review states, explicit coverage and a copyable CLI command.
+
+- Reports now expose an effective `gate` (`pass`, `pass-with-warnings`, or
+  `fail`) and list unavailable frame-rate, H.264, audio-codec, and PCM-depth
+  measurements in `unverifiedChecks`; `ok` retains its no-error meaning.
+- Published packages include declarations for `screenproof` and
+  `screenproof/browser`. A packed strict-TypeScript/runtime consumer and one
+  Node 24 workflow gate root tests, web tests/build, and positive/negative
+  composite-Action fixtures.
+- The browser inspector adds Copy JSON, Download JSON, clear/reset, and a CLI
+  handoff, plus paired audit-tree regressions and a small real late-`moov`
+  H.264/AAC control.
+- `UPCOMING_CLASSES` records Apple-published iPhone Duo outer and inner display
+  dimensions separately from the currently uploadable default table.
+- The README publishes a coverage table separating checked, checked-when-
+  present, conservatively-checked, partial-folder, and out-of-scope
+  requirements, and corrects the AAC bitrate and JPEG support statements.
+
+### Changed
+
+- **A tree that passed 0.6.0 can fail this release.** PNG alpha/transparency is
+  now an error by default; malformed PNG/JPEG headers, unsupported JPEG frame
+  types (anything other than SOF0/1/2), disguised MP3 audio, and unsupported
+  64-bit PCM no longer pass their corresponding checks.
+- iPad 12.9-inch classification now mirrors fastlane's exact predicates
+  (`app_ipad_pro_129`, or `12.9` together with `2nd generation`). Near-miss
+  names such as `ipad_pro_129-1.png` stay in the 13-inch bucket, so a locale
+  that previously split into two under-cap buckets can now report
+  `screenshot-count-over`.
+- App-preview audio validation reads the MPEG-4 audio object type and QuickTime
+  sound-description version/format flags instead of trusting the `mp4a` sample
+  entry or a single nominal bit-depth field.
+- Screenshot provenance was re-verified on 2026-09-12. Apple Watch labels now
+  include Ultra 4, Series 12, and SE 3; iPhone Duo sizes remain outside default
+  validation until Apple upload availability and fastlane compatibility are
+  verified.
+- CLI image reads use a bounded 1 MiB header. Browser reads run two files
+  concurrently, seek late `moov` metadata within a 64 MiB limit, reject
+  over-500 MB previews before payload reads, and cap cumulative slices at
+  128 MiB. An image whose pre-image metadata exceeds the header budget fails
+  with an explicit budget reason rather than a truncation claim.
+- The browser verdict consumes the report gate for PASS, PASS WITH WARNINGS,
+  and FAIL, and discloses unknown-metadata checks separately.
+
+### Fixed
+
+- Windows release checks normalize roots before JSON escaping, run npm using
+  its JavaScript entry point, and clean build output without Unix shell commands.
+  CI now runs on Linux and Windows. POSIX permission and unavailable file-symlink
+  tests skip explicitly; directory junction scanning is exercised separately.
+- Report findings for non-media files and nested folders remain visible even
+  when there is no asset row to attach them to.
+
+- Release-review regressions RR-01 through RR-05: MPEG-4 AudioSpecificConfig
+  distinguishes AAC from MPEG Layer 3/CELP and missing declarations; invalid
+  sample rates fail without rounding or silently skipping the check.
+- Duplicate browser paths preserve every selected input and fail with an
+  explicit recovery instruction instead of allowing last-file-wins results.
+- PNG compression/filter/interlace fields and JPEG precision, component IDs,
+  sampling factors, and quantization selectors receive structural checks.
+- The packaged TypeScript consumer checks all declarations with
+  `skipLibCheck: false`. The additive `inspectBrowserSelection` browser API
+  exposes the actual scan alongside the report for accurate asset-level UI.
+
+- CLI and browser scans now share flat/locale detection, hidden-directory
+  handling, nonrecursive locale scans, and missing-media diagnostics. Browser
+  folder selection strips exactly the chosen root.
+- Browser traversal and payload reads share one error boundary and operation
+  identity: stale selections cannot replace newer reports, failures restore
+  controls, and native chooser buttons remain visibly keyboard-focusable with
+  accurate disabled styling.
+- Strict human output now agrees with its failing exit status; quiet mode hides
+  report-level info findings; config rejects inherited object-property names.
+- Browser product copy, singular error grammar, canonical metadata, favicon,
+  title, and system monospace fallback were corrected.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added

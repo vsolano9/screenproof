@@ -6,12 +6,13 @@ import {
   applyDimensionOverrides,
   classify,
   DEFAULT_CLASSES,
+  UPCOMING_CLASSES,
   nearestValidSize,
   VERIFIED_ON,
 } from "./dimensions.ts";
 
 test("verification date is recorded", () => {
-  assert.equal(VERIFIED_ON, "2026-08-23");
+  assert.equal(VERIFIED_ON, "2026-09-12");
 });
 
 test("classifies key sizes to their device classes", () => {
@@ -46,6 +47,27 @@ test("classifies key sizes to their device classes", () => {
   }
 });
 
+test("published iPhone Duo sizes are classified separately from uploadable sizes", () => {
+  const cases: [number, number, string][] = [
+    [1398, 2034, "iphone-duo-outer"],
+    [2034, 1398, "iphone-duo-outer"],
+    [2007, 2853, "iphone-duo-inner"],
+    [2853, 2007, "iphone-duo-inner"],
+  ];
+  for (const [width, height, expected] of cases) {
+    assert.equal(classify(width, height, "en-US/01.png", DEFAULT_CLASSES), null);
+    assert.equal(classify(width, height, "en-US/01.png", UPCOMING_CLASSES)?.id, expected);
+  }
+});
+
+test("Apple Watch labels name the current models for each accepted size", () => {
+  const labels = new Map(DEFAULT_CLASSES.filter(({ platform }) => platform === "watch").map(({ id, label }) => [id, label]));
+  assert.equal(labels.get("watch-ultra3"), "Apple Watch Ultra 4/Ultra 3");
+  assert.equal(labels.get("watch-s10"), "Apple Watch Series 12/11/10");
+  assert.equal(labels.get("watch-s4"), "Apple Watch Series 6/5/4/SE 3/SE 2/SE");
+  assert.equal(labels.get("watch-s3"), "Apple Watch Series 3/2/1");
+});
+
 test("every table size classifies back to its class (ambiguous classes fall to their default partner)", () => {
   for (const deviceClass of DEFAULT_CLASSES) {
     const expected =
@@ -57,14 +79,19 @@ test("every table size classifies back to its class (ambiguous classes fall to t
   }
 });
 
-test("iPad 12.9 2nd gen wins only via deliver's path keywords", () => {
+test("iPad 12.9 2nd gen wins only via fastlane's exact path predicates", () => {
   assert.equal(classify(2048, 2732, "en-US/APP_IPAD_PRO_129_01.png", DEFAULT_CLASSES)?.id, "ipad-12.9");
   assert.equal(
     classify(2048, 2732, "en-US/iPad Pro (12.9-inch) (2nd generation) 01.png", DEFAULT_CLASSES)?.id,
     "ipad-12.9",
   );
-  // The 3rd-gen keyword contains 129 but not the 2nd-gen substring: stays 13-inch.
-  assert.equal(classify(2048, 2732, "en-US/IPAD_PRO_3GEN_129_01.png", DEFAULT_CLASSES)?.id, "ipad-13");
+  for (const nearMiss of [
+    "en-US/IPAD_PRO_129_01.png",
+    "en-US/iPad Pro (12.9-inch) (2nd) 01.png",
+    "en-US/IPAD_PRO_3GEN_129_01.png",
+  ]) {
+    assert.equal(classify(2048, 2732, nearMiss, DEFAULT_CLASSES)?.id, "ipad-13", nearMiss);
+  }
   assert.equal(classify(2732, 2048, "en-US/01.png", DEFAULT_CLASSES)?.id, "ipad-13");
 });
 
@@ -142,4 +169,9 @@ test("no size maps to more than one class except the two documented ambiguities"
 test("shipped table matches the checked-in snapshot", async () => {
   const raw = await readFile(new URL("../fixtures/dimensions-snapshot.json", import.meta.url), "utf8");
   assert.deepEqual(JSON.parse(raw), JSON.parse(JSON.stringify(DEFAULT_CLASSES)));
+});
+
+test("upcoming table matches the checked-in snapshot", async () => {
+  const raw = await readFile(new URL("../fixtures/upcoming-dimensions-snapshot.json", import.meta.url), "utf8");
+  assert.deepEqual(JSON.parse(raw), JSON.parse(JSON.stringify(UPCOMING_CLASSES)));
 });

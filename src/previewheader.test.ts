@@ -131,8 +131,46 @@ test("reads every audio track's codec, channels, sample rate, and bit depth", ()
     ],
   }));
   assert.deepEqual(info.audioTracks, [
-    { codecFourCC: "mp4a", channelCount: 1, sampleRateHz: 48_000, bitDepth: 16, enabled: true },
-    { codecFourCC: "sowt", channelCount: 1, sampleRateHz: 48_000, bitDepth: 24, enabled: true },
+    { codecFourCC: "mp4a", codec: "aac", channelCount: 1, sampleRateHz: 48_000, bitDepth: null, enabled: true },
+    { codecFourCC: "sowt", codec: "pcm", channelCount: 1, sampleRateHz: 48_000, bitDepth: 24, enabled: true },
+  ]);
+});
+
+test("derives PCM bit depth from FourCC and versioned sound descriptions", () => {
+  const info = infoOf(makePreviewFile({
+    audio: [
+      { codecFourCC: "in24", bitDepth: 16, soundDescriptionVersion: 0 },
+      { codecFourCC: "fl64", bitDepth: 16, soundDescriptionVersion: 1 },
+      { codecFourCC: "lpcm", bitDepth: 32, soundDescriptionVersion: 2, formatSpecificFlags: 0x09 },
+    ],
+  }));
+  assert.deepEqual(info.audioTracks.map((track) => ({
+    codecFourCC: track.codecFourCC,
+    codec: track.codec,
+    bitDepth: track.bitDepth,
+    pcmFormatFlags: track.pcmFormatFlags ?? null,
+  })), [
+    { codecFourCC: "in24", codec: "pcm", bitDepth: 24, pcmFormatFlags: null },
+    { codecFourCC: "fl64", codec: "pcm", bitDepth: 64, pcmFormatFlags: null },
+    { codecFourCC: "lpcm", codec: "pcm", bitDepth: 32, pcmFormatFlags: 0x09 },
+  ]);
+});
+
+test("uses esds object type to distinguish AAC, MP3, and unknown mp4a entries", () => {
+  const info = infoOf(makePreviewFile({
+    audio: [
+      { codecFourCC: "mp4a", objectTypeIndication: 0x40 },
+      { codecFourCC: "mp4a", objectTypeIndication: 0x69 },
+      { codecFourCC: "mp4a", objectTypeIndication: null },
+    ],
+  }));
+  assert.deepEqual(info.audioTracks.map((track) => ({
+    codec: track.codec,
+    bitDepth: track.bitDepth,
+  })), [
+    { codec: "aac", bitDepth: null },
+    { codec: "mp3", bitDepth: null },
+    { codec: "unknown", bitDepth: null },
   ]);
 });
 
@@ -240,7 +278,7 @@ test("file parsing skips media payload atoms and reads moov metadata", async () 
       frameRate: 30,
       avc: { profileIndication: 100, levelIndication: 40 },
       audioTracks: [
-        { codecFourCC: "mp4a", channelCount: 2, sampleRateHz: 44_100, bitDepth: 16, enabled: true },
+        { codecFourCC: "mp4a", codec: "aac", channelCount: 2, sampleRateHz: 44_100, bitDepth: null, enabled: true },
       ],
       videoTrackEnabled: true,
     },

@@ -11,14 +11,15 @@
  * the missing/empty-root diagnostics.
  */
 
-import { readdir, readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { open, readdir, stat } from "node:fs/promises";
+import { dirname, basename, join } from "node:path";
 
 import { parseImageHeader } from "./imageheader.ts";
-import { fileExtension, IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS, VIDEO_EXTENSIONS } from "./media.ts";
+import { fileExtension, PREVIEW_EXTENSIONS } from "./media.ts";
 import { parsePreviewFile } from "./previewfile.ts";
-import { isKnownLocale, NON_LOCALE_FOLDERS } from "./locales.ts";
-import type { Config, Finding, LocaleScan, PreviewFile, ScanResult, ScreenshotFile } from "./types.ts";
+import { NON_LOCALE_FOLDERS } from "./locales.ts";
+import { planScan, type TreeEntry } from "./scan-tree.ts";
+import type { Config, Finding, PreviewFile, ScanResult, ScreenshotFile } from "./types.ts";
 
 
 export interface ScanOptions {
@@ -28,14 +29,6 @@ export interface ScanOptions {
 
 function isHidden(name: string): boolean {
   return name.startsWith(".");
-}
-
-function isImageFile(name: string): boolean {
-  return IMAGE_EXTENSIONS.has(fileExtension(name));
-}
-
-function isPreviewFile(name: string): boolean {
-  return VIDEO_EXTENSIONS.has(fileExtension(name));
 }
 
 interface DirEntry {
@@ -71,10 +64,22 @@ async function entryKind(dir: string, entry: DirEntry): Promise<EntryKind> {
 async function scanImage(dir: string, name: string, locale: string): Promise<ScreenshotFile> {
   const path = join(dir, name);
   let parse: ScreenshotFile["parse"];
+  let handle;
   try {
-    parse = parseImageHeader(new Uint8Array(await readFile(path)));
+    handle = await open(path, "r");
+    const { size } = await handle.stat();
+    const bytes = Buffer.allocUnsafe(Math.min(size, 1024 * 1024));
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    parse = parseImageHeader(bytes.subarray(0, offset), size);
   } catch (err) {
     parse = { ok: false, reason: `could not read file: ${(err as Error).message}` };
+  } finally {
+    await handle?.close();
   }
   return { path, name, locale, parse };
 }
@@ -107,148 +112,45 @@ async function scanPreview(dir: string, name: string, locale: string): Promise<P
   };
 }
 
-interface FolderScan {
-  files: ScreenshotFile[];
-  previews: PreviewFile[];
-  unexpectedFiles: string[];
-}
-
-async function scanFiles(
-  dir: string,
-  locale: string,
-  entries: DirEntry[],
-  options: { foldersAsUnexpected: boolean },
-): Promise<FolderScan> {
-  const files: ScreenshotFile[] = [];
-  const previews: PreviewFile[] = [];
-  const unexpectedFiles: string[] = [];
-  const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
-  for (const entry of sorted) {
-    if (isHidden(entry.name)) continue;
-    const kind = await entryKind(dir, entry);
-    if (kind === "dir") {
-      if (options.foldersAsUnexpected) unexpectedFiles.push(`${entry.name}/`);
-      continue;
-    }
-    if (kind === "broken") {
-      unexpectedFiles.push(entry.name);
-      continue;
-    }
-    if (kind !== "file") continue;
-    if (isImageFile(entry.name)) {
-      files.push(await scanImage(dir, entry.name, locale));
-    } else if (isPreviewFile(entry.name)) {
-      previews.push(await scanPreview(dir, entry.name, locale));
-    } else {
-      unexpectedFiles.push(entry.name);
-    }
-  }
-  return { files, previews, unexpectedFiles };
-}
-
 function missingFinding(message: string): Finding {
   return { locale: "", rule: "missing-screenshots", severity: "error", message };
 }
 
 /** Scan a screenshots root in locale or flat mode. */
 export async function scan(root: string, config: Config, options: ScanOptions = {}): Promise<ScanResult> {
-  let entries;
+  const tree = new Map<string, Omit<TreeEntry, "path">>();
+  const readDirectory = async (relative: string) => {
+    const dir = join(root, relative);
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (isHidden(entry.name)) continue;
+      const kind = await entryKind(dir, entry);
+      if (kind) tree.set(relative ? `${relative}/${entry.name}` : entry.name, { kind });
+    }
+  };
   try {
-    entries = await readdir(root, { withFileTypes: true });
+    await readDirectory("");
   } catch {
-    return {
-      root,
-      mode: "locale",
-      locales: [],
-      diagnostics: [missingFinding(`screenshots folder not found: ${root}`)],
-    };
+    return { root, mode: "locale", locales: [], diagnostics: [missingFinding(`screenshots folder not found: ${root}`)] };
   }
-
-  const visible = entries.filter((entry) => !isHidden(entry.name));
-  const kinds = new Map<string, EntryKind>();
-  for (const entry of visible) {
-    kinds.set(entry.name, await entryKind(root, entry));
-  }
-  const dirs = visible
-    .filter((entry) => kinds.get(entry.name) === "dir")
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Locale mode when any folder is a recognized locale, or when the root is
-  // folders-only (no loose images): a deliver tree with misspelled locale
-  // folders must still scan as a tree so the unknown-locale rule can fire,
-  // instead of being mistaken for an empty flat folder.
-  const rootAssets = visible.some(
-    (entry) => kinds.get(entry.name) === "file" && (isImageFile(entry.name) || isPreviewFile(entry.name)),
-  );
-  const localeMode =
-    !options.forceFlat &&
-    (dirs.some((dir) => dir.name === "default" || isKnownLocale(dir.name, config)) ||
-      (dirs.length > 0 && !rootAssets));
-
-  if (!localeMode) {
-    const { files, previews, unexpectedFiles } = await scanFiles(root, "", visible, {
-      foldersAsUnexpected: false,
-    });
-    const diagnostics: Finding[] =
-      files.length === 0 && previews.length === 0
-        ? [missingFinding(`no screenshots or app previews found in ${root}`)]
-        : [];
-    return {
-      root,
-      mode: "flat",
-      locales: [{ locale: "", isKnownLocale: true, files, previews, unexpectedFiles }],
-      diagnostics,
-    };
-  }
-
-  const locales: LocaleScan[] = [];
-  const diagnostics: Finding[] = [];
-  for (const dir of dirs) {
-    if (config.locales.ignore.includes(dir.name)) continue;
-    const dirPath = join(root, dir.name);
-    let children;
-    try {
-      children = await readdir(dirPath, { withFileTypes: true });
-    } catch (err) {
-      diagnostics.push({
-        locale: dir.name,
-        rule: "screenshot-unreadable",
-        severity: "error",
-        message: `locale folder could not be read: ${(err as Error).message}`,
-      });
-      continue;
-    }
-    const { files, previews, unexpectedFiles } = await scanFiles(dirPath, dir.name, children, {
-      foldersAsUnexpected: true,
-    });
-    locales.push({
-      locale: dir.name,
-      isKnownLocale: dir.name === "default" ? false : isKnownLocale(dir.name, config),
-      files,
-      previews,
-      unexpectedFiles,
-    });
-  }
-
-  // Loose visible files directly in the root belong inside locale folders;
-  // they land in a synthetic "" entry that validate flags.
-  const rootLoose = visible.filter((entry) => {
-    const kind = kinds.get(entry.name);
-    return kind === "file" || kind === "broken";
-  });
-  if (rootLoose.length > 0) {
-    const { files, previews, unexpectedFiles } = await scanFiles(root, "", rootLoose, {
-      foldersAsUnexpected: false,
-    });
-    if (files.length > 0 || previews.length > 0 || unexpectedFiles.length > 0) {
-      locales.push({ locale: "", isKnownLocale: false, files, previews, unexpectedFiles });
+  // Determine mode before enumerating children: flat scans never enter folders.
+  const topPlan = planScan(root, [...tree.keys()], path => tree.get(path)!, config, options.forceFlat);
+  if (topPlan.mode === "locale") {
+    for (const [path, entry] of [...tree]) {
+      if (entry.kind !== "dir" || config.locales.ignore.includes(path)) continue;
+      try { await readDirectory(path); }
+      catch (error) { entry.readError = (error as Error).message; }
     }
   }
-
-  if (locales.length === 0 && diagnostics.length === 0) {
-    diagnostics.push(missingFinding(`no screenshots found in ${root}`));
+  const plan = planScan(root, [...tree.keys()], path => tree.get(path)!, config, options.forceFlat);
+  const locales = [];
+  for (const locale of plan.locales) {
+    const files: ScreenshotFile[] = [];
+    const previews: PreviewFile[] = [];
+    for (const path of locale.images) files.push(await scanImage(join(root, dirname(path)), basename(path), locale.locale));
+    for (const path of locale.previews) previews.push(await scanPreview(join(root, dirname(path)), basename(path), locale.locale));
+    locales.push({ locale: locale.locale, isKnownLocale: locale.isKnownLocale, files, previews, unexpectedFiles: locale.unexpectedFiles });
   }
-  return { root, mode: "locale", locales, diagnostics };
+  return { root, mode: plan.mode, locales, diagnostics: plan.diagnostics };
 }
 
 /**

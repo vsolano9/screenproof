@@ -19,11 +19,14 @@ import type {
   RuleLevel,
   ScanResult,
   Severity,
+  UnverifiedCheck,
 } from "./types.ts";
 
 export interface ValidateOptions {
   /** Locale folders of a deliver metadata tree, for the cross-tree check. */
   metadataLocales?: string[] | null;
+  /** Treat warnings as a failing gate without changing `ok` semantics. */
+  strict?: boolean;
 }
 
 /**
@@ -59,11 +62,6 @@ const H264_PROFILE_NAMES: Readonly<Record<number, string>> = {
   122: "High 4:2:2",
   244: "High 4:4:4 Predictive",
 };
-
-/** Uncompressed audio sample entries, which Apple allows only alongside ProRes. */
-const PCM_FOURCCS: ReadonlySet<string> = new Set([
-  "lpcm", "sowt", "twos", "raw ", "in24", "in32", "fl32", "fl64",
-]);
 
 /** Apple: "44.1kHz or 48kHz". */
 const AUDIO_SAMPLE_RATES: ReadonlySet<number> = new Set([44_100, 48_000]);
@@ -119,26 +117,29 @@ function audioProblems(
   const prores = videoCodecFourCC === "apch";
   const seenCodecProblem = new Set<string>();
   for (const track of tracks) {
-    const isPcm = PCM_FOURCCS.has(track.codecFourCC);
-    const isAac = track.codecFourCC === "mp4a";
-    if (!isAac && !(isPcm && prores) && !seenCodecProblem.has(track.codecFourCC)) {
-      seenCodecProblem.add(track.codecFourCC);
-      problems.push({
-        rule: "preview-audio-codec",
-        message: isPcm
-          ? `audio sample entry ${track.codecFourCC} is PCM, which Apple accepts only with ProRes 422 HQ; an H.264 preview needs 256 kbps AAC`
-          : `audio sample entry ${track.codecFourCC} is not accepted; use 256 kbps AAC${prores ? " or PCM" : ""}`,
-      });
+    const isPcm = track.codec === "pcm";
+    const isAac = track.codec === "aac";
+    if (!isAac && !(isPcm && prores) && !seenCodecProblem.has(track.codec)) {
+      seenCodecProblem.add(track.codec);
+      let message: string;
+      if (isPcm) {
+        message = `audio sample entry ${track.codecFourCC} is PCM, which Apple accepts only with ProRes 422 HQ; an H.264 preview needs AAC`;
+      } else if (track.codec === "mp3") {
+        message = `audio codec is MP3 inside sample entry ${track.codecFourCC}; App Store previews require AAC${prores ? " or PCM" : ""}`;
+      } else {
+        message = `audio codec cannot be verified from sample entry ${track.codecFourCC}; use AAC${prores ? " or PCM" : ""}`;
+      }
+      problems.push({ rule: "preview-audio-codec", message });
     }
 
-    if (track.sampleRateHz > 0 && !AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
+    if (!AUDIO_SAMPLE_RATES.has(track.sampleRateHz)) {
       problems.push({
         rule: "preview-audio-sample-rate",
         message: `audio sample rate ${track.sampleRateHz} Hz is not 44100 or 48000 Hz`,
       });
     }
 
-    if (isPcm && track.bitDepth > 0 && !PCM_BIT_DEPTHS.has(track.bitDepth)) {
+    if (isPcm && track.bitDepth !== null && !PCM_BIT_DEPTHS.has(track.bitDepth)) {
       problems.push({
         rule: "preview-audio-bit-depth",
         message: `PCM audio is ${track.bitDepth}-bit; Apple accepts 16-, 24-, or 32-bit`,
@@ -180,6 +181,7 @@ const PRIMARY_BY_PLATFORM: ReadonlyArray<{ platform: string; classId: string; me
 export function validate(scan: ScanResult, config: Config, options: ValidateOptions = {}): LintReport {
   const classes = applyDimensionOverrides(DEFAULT_CLASSES, config.dimensions);
   const findings: Finding[] = [];
+  const unverifiedChecks: UnverifiedCheck[] = [];
 
   const levelOf = (rule: string): RuleLevel =>
     config.rules[rule] ?? DEFAULT_RULES[rule] ?? "warning";
@@ -253,7 +255,7 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
         emit(
           "screenshot-png-alpha",
           locale.locale,
-          "PNG declares transparency; App Store Connect may reject it",
+          "PNG alpha channels and transparency are not allowed for App Store screenshots",
           file.name,
         );
       }
@@ -310,6 +312,46 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
       const codecProblem = previewCodecProblem(file.name, codecFourCC);
       if (codecProblem !== null) {
         emit("preview-codec", locale.locale, codecProblem, file.name);
+      }
+
+      if (frameRate === null) {
+        unverifiedChecks.push({
+          locale: locale.locale,
+          file: file.name,
+          check: "preview-frame-rate",
+          reason: "frame rate is not declared in readable sample metadata",
+        });
+      }
+      if ((codecFourCC === "avc1" || codecFourCC === "avc3") && avc === null) {
+        unverifiedChecks.push({
+          locale: locale.locale,
+          file: file.name,
+          check: "preview-h264-profile",
+          reason: "H.264 profile and level are not declared in a readable avcC box",
+        });
+      }
+      for (const track of audioTracks) {
+        if (!Number.isFinite(track.sampleRateHz) || track.sampleRateHz <= 0) {
+          unverifiedChecks.push({
+            locale: locale.locale, file: file.name, check: "preview-audio-sample-rate",
+            reason: "audio sample rate is missing or invalid; the sample-rate rule fails conservatively",
+          });
+        }
+        if (track.codec === "unknown") {
+          unverifiedChecks.push({
+            locale: locale.locale,
+            file: file.name,
+            check: "preview-audio-codec",
+            reason: `audio codec is not identified by sample entry ${track.codecFourCC}`,
+          });
+        } else if (track.codec === "pcm" && track.bitDepth === null) {
+          unverifiedChecks.push({
+            locale: locale.locale,
+            file: file.name,
+            check: "preview-audio-bit-depth",
+            reason: `PCM bit depth is not declared by sample entry ${track.codecFourCC}`,
+          });
+        }
       }
 
       if (frameRate !== null && frameRate > MAX_PREVIEW_FPS) {
@@ -439,10 +481,15 @@ export function validate(scan: ScanResult, config: Config, options: ValidateOpti
     }
   }
 
-  return assemble(scan, findings);
+  return assemble(scan, findings, unverifiedChecks, options.strict ?? false);
 }
 
-function assemble(scan: ScanResult, findings: Finding[]): LintReport {
+function assemble(
+  scan: ScanResult,
+  findings: Finding[],
+  unverifiedChecks: UnverifiedCheck[],
+  strict: boolean,
+): LintReport {
   const sortFindings = (a: Finding, b: Finding): number =>
     a.rule.localeCompare(b.rule) || (a.file ?? "").localeCompare(b.file ?? "") || a.message.localeCompare(b.message);
 
@@ -469,6 +516,13 @@ function assemble(scan: ScanResult, findings: Finding[]): LintReport {
 
   const count = (severity: Severity): number => flattened.filter((f) => f.severity === severity).length;
   const errorCount = count("error");
+  const warningCount = count("warning");
+  const gate =
+    errorCount > 0 || (strict && warningCount > 0)
+      ? "fail"
+      : warningCount > 0
+        ? "pass-with-warnings"
+        : "pass";
 
   return {
     root: scan.root,
@@ -476,8 +530,10 @@ function assemble(scan: ScanResult, findings: Finding[]): LintReport {
     locales,
     findings: flattened,
     errorCount,
-    warningCount: count("warning"),
+    warningCount,
     infoCount: count("info"),
     ok: errorCount === 0,
+    gate,
+    unverifiedChecks,
   };
 }

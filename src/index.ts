@@ -11,6 +11,7 @@ export {
   classify,
   DEFAULT_CLASSES,
   nearestValidSize,
+  UPCOMING_CLASSES,
   VERIFIED_ON,
 } from "./dimensions.ts";
 export { parseImageHeader } from "./imageheader.ts";
@@ -38,6 +39,7 @@ export type {
   DeviceClass,
   DimensionOverrides,
   Finding,
+  GateStatus,
   ImageInfo,
   LintReport,
   LocaleReport,
@@ -46,6 +48,7 @@ export type {
   ParseResult,
   Platform,
   PreviewAudioTrack,
+  PreviewAudioCodec,
   PreviewFile,
   PreviewInfo,
   PreviewParseResult,
@@ -54,4 +57,5 @@ export type {
   ScreenshotFile,
   Severity,
   Size,
+  UnverifiedCheck,
 } from "./types.ts";
