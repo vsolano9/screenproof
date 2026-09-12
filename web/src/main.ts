@@ -1,5 +1,6 @@
 import { inspectBrowserFixtures, type BrowserFixtureInput } from "../../src/browser.ts";
 import type { Finding, LintReport } from "../../src/types.ts";
+import { Inspection, readDrop, selectedPath } from "./intake.ts";
 
 import "./tokens.generated.css";
 import "./styles.css";
@@ -113,7 +114,16 @@ const results = requiredElement<HTMLDivElement>("#results");
 const fileInput = requiredElement<HTMLInputElement>("#file-input");
 const folderInput = requiredElement<HTMLInputElement>("#folder-input");
 const dropZone = requiredElement<HTMLDivElement>("#drop-zone");
-let selectionVersion = 0;
+const inspection = new Inspection({
+  start: beginInspection,
+  complete: async (files, current) => {
+    const inputs = await Promise.all(files.map(async (file): Promise<BrowserFixtureInput> => ({
+      name: file.name, path: selectedPath(file), bytes: new Uint8Array(await file.arrayBuffer()), sizeBytes: file.size,
+    })));
+    if (current()) renderReport(inspectBrowserFixtures(inputs), inputs.map(input => input.path ?? input.name));
+  },
+  error: renderReadError,
+});
 
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture]")) {
   button.addEventListener("click", () => void loadFixture(button.dataset.fixture ?? ""));
@@ -141,7 +151,10 @@ for (const type of ["dragleave", "drop"] as const) {
     delete dropZone.dataset.dragging;
   });
 }
-dropZone.addEventListener("drop", (event) => void inspectDrop(event.dataTransfer));
+dropZone.addEventListener("drop", (event) => {
+  setSelectedFixture("");
+  void inspection.run("local folder", current => readDrop(event.dataTransfer, current));
+});
 
 const requestedFixture = new URLSearchParams(location.search).get("fixture");
 if (requestedFixture && fixtures.some((fixture) => fixture.id === requestedFixture)) {
@@ -149,85 +162,27 @@ if (requestedFixture && fixtures.some((fixture) => fixture.id === requestedFixtu
 }
 
 async function loadFixture(id: string): Promise<void> {
-  const fixture = fixtures.find((candidate) => candidate.id === id);
+  const fixture = fixtures.find(candidate => candidate.id === id);
   if (!fixture) return;
   setSelectedFixture(id);
-  const version = beginInspection(fixture.label);
-  try {
+  await inspection.run(fixture.label, async current => {
     const response = await fetch(fixture.source);
+    if (!current()) return [];
     if (!response.ok) throw new Error(`fixture request returned ${response.status}`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (version !== selectionVersion) return;
-    renderReport(
-      inspectBrowserFixtures([{ name: fixture.path?.split("/").at(-1) ?? fixture.source.split("/").at(-1) ?? fixture.label, path: fixture.path, bytes }]),
-      [fixture.path ?? fixture.source.split("/").at(-1) ?? fixture.label],
-    );
-  } catch (error) {
-    if (version === selectionVersion) renderReadError(fixture.label, error);
-  }
+    const file = new File([await response.blob()], fixture.path?.split("/").at(-1) ?? fixture.source.split("/").at(-1)!);
+    if (fixture.path) Object.defineProperty(file, "webkitRelativePath", { value: `example/${fixture.path}` });
+    return [file];
+  });
 }
 
 async function inspectFiles(files: readonly File[]): Promise<void> {
-  if (files.length === 0) return;
   setSelectedFixture("");
-  const version = beginInspection(files.length === 1 ? files[0]!.name : `${files.length} files`);
-  try {
-    const inputs = await Promise.all(files.map(async (file): Promise<BrowserFixtureInput> => ({
-      name: file.name,
-      path: normalizedRelativePath(file),
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      sizeBytes: file.size,
-    })));
-    if (version !== selectionVersion) return;
-    renderReport(inspectBrowserFixtures(inputs), inputs.map((input) => input.path ?? input.name));
-  } catch (error) {
-    if (version === selectionVersion) renderReadError("local files", error);
-  }
+  await inspection.run(files.length === 1 ? files[0]!.name : `${files.length} files`, async () => [...files]);
 }
 
-async function inspectDrop(dataTransfer: DataTransfer | null): Promise<void> {
-  if (!dataTransfer) return;
-  const entries = [...dataTransfer.items]
-    .map((item) => (item as DataTransferItem & { webkitGetAsEntry?: () => FileSystemEntry | null }).webkitGetAsEntry?.())
-    .filter((entry): entry is FileSystemEntry => entry !== null && entry !== undefined);
-  if (entries.length === 0) {
-    await inspectFiles([...dataTransfer.files]);
-    return;
-  }
-  const files = (await Promise.all(entries.map((entry) => readEntry(entry, "")))).flat();
-  await inspectFiles(files);
-}
-
-async function readEntry(entry: FileSystemEntry, parent: string): Promise<File[]> {
-  if (entry.isFile) {
-    const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
-    Object.defineProperty(file, "webkitRelativePath", { configurable: true, value: `${parent}${file.name}` });
-    return [file];
-  }
-  if (!entry.isDirectory) return [];
-  const directory = entry as FileSystemDirectoryEntry;
-  const reader = directory.createReader();
-  const children: FileSystemEntry[] = [];
-  for (;;) {
-    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => reader.readEntries(resolve, reject));
-    if (batch.length === 0) break;
-    children.push(...batch);
-  }
-  return (await Promise.all(children.map((child) => readEntry(child, `${parent}${directory.name}/`)))).flat();
-}
-
-function normalizedRelativePath(file: File): string | undefined {
-  const raw = file.webkitRelativePath;
-  if (!raw) return undefined;
-  const parts = raw.split("/").filter(Boolean);
-  return parts.length >= 3 ? parts.slice(1).join("/") : parts.join("/");
-}
-
-function beginInspection(label: string): number {
-  selectionVersion += 1;
+function beginInspection(label: string): void {
   results.innerHTML = `<div class="loading-state"><span>Inspecting locally</span><strong>${escapeHtml(label)}</strong></div>`;
   setControlsDisabled(true);
-  return selectionVersion;
 }
 
 function renderReport(report: LintReport, paths: readonly string[]): void {

@@ -299,7 +299,7 @@ label:focus-within,
 }
 
 .fixture-button:disabled,
-input:disabled + .button {
+.button:has(+ input:disabled) {
   cursor: wait;
   opacity: 0.5;
 }
