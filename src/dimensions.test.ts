@@ -57,14 +57,19 @@ test("every table size classifies back to its class (ambiguous classes fall to t
   }
 });
 
-test("iPad 12.9 2nd gen wins only via deliver's path keywords", () => {
+test("iPad 12.9 2nd gen wins only via fastlane's exact path predicates", () => {
   assert.equal(classify(2048, 2732, "en-US/APP_IPAD_PRO_129_01.png", DEFAULT_CLASSES)?.id, "ipad-12.9");
   assert.equal(
     classify(2048, 2732, "en-US/iPad Pro (12.9-inch) (2nd generation) 01.png", DEFAULT_CLASSES)?.id,
     "ipad-12.9",
   );
-  // The 3rd-gen keyword contains 129 but not the 2nd-gen substring: stays 13-inch.
-  assert.equal(classify(2048, 2732, "en-US/IPAD_PRO_3GEN_129_01.png", DEFAULT_CLASSES)?.id, "ipad-13");
+  for (const nearMiss of [
+    "en-US/IPAD_PRO_129_01.png",
+    "en-US/iPad Pro (12.9-inch) (2nd) 01.png",
+    "en-US/IPAD_PRO_3GEN_129_01.png",
+  ]) {
+    assert.equal(classify(2048, 2732, nearMiss, DEFAULT_CLASSES)?.id, "ipad-13", nearMiss);
+  }
   assert.equal(classify(2732, 2048, "en-US/01.png", DEFAULT_CLASSES)?.id, "ipad-13");
 });
 

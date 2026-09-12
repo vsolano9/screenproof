@@ -130,11 +130,12 @@ export function classify(
   const lower = filePath.toLowerCase();
 
   if (ids.has("ipad-13") && ids.has("ipad-12.9")) {
-    // deliver: 2nd gen only when the path contains "ipad_pro_129" (note that
-    // the 3rd-gen keyword ipad_pro_3gen_129 does not contain that substring)
-    // or names 12.9 together with 2nd generation. Default: 13-inch.
+    // Mirrors fastlane deliver's exact shared-resolution predicate, verified
+    // 2026-09-12:
+    // https://github.com/fastlane/fastlane/blob/master/deliver/lib/deliver/app_screenshot.rb
     const secondGen =
-      lower.includes("ipad_pro_129") || (lower.includes("12.9") && lower.includes("2nd"));
+      lower.includes("app_ipad_pro_129") ||
+      (lower.includes("12.9") && lower.includes("2nd generation"));
     const winner = secondGen ? "ipad-12.9" : "ipad-13";
     return matches.find((m) => m.id === winner)!;
   }

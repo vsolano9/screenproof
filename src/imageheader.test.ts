@@ -168,3 +168,63 @@ test("rejects an illegal PNG color type", () => {
   const reason = expectFail(png);
   assert.match(reason, /invalid color type/);
 });
+
+test("rejects PNG bit depths that are illegal for the IHDR color type", () => {
+  const cases = [
+    { colorType: 0, bitDepth: 3 },
+    { colorType: 2, bitDepth: 4 },
+    { colorType: 3, bitDepth: 16 },
+    { colorType: 4, bitDepth: 4 },
+    { colorType: 6, bitDepth: 1 },
+  ];
+  for (const { colorType, bitDepth } of cases) {
+    const png = Uint8Array.from(makePng(10, 10));
+    png[24] = bitDepth;
+    png[25] = colorType;
+    const reason = expectFail(png);
+    assert.match(reason, new RegExp(`invalid bit depth ${bitDepth} for color type ${colorType}`));
+  }
+});
+test("accepts every legal PNG IHDR bit-depth and color-type combination", () => {
+  const combinations: readonly [number, readonly number[]][] = [
+    [0, [1, 2, 4, 8, 16]],
+    [2, [8, 16]],
+    [3, [1, 2, 4, 8]],
+    [4, [8, 16]],
+    [6, [8, 16]],
+  ];
+  for (const [colorType, bitDepths] of combinations) {
+    for (const bitDepth of bitDepths) {
+      const png = Uint8Array.from(makePng(10, 10));
+      png[24] = bitDepth;
+      png[25] = colorType;
+      expectOk(png);
+    }
+  }
+});
+
+test("rejects a JPEG whose frame segment exceeds the file bounds", () => {
+  const jpeg = Uint8Array.from(makeJpeg(1320, 2868).slice(0, 11));
+  jpeg[4] = 0xff;
+  jpeg[5] = 0xff;
+  assert.match(expectFail(jpeg), /frame segment exceeds file bounds/);
+});
+
+test("rejects JPEG frame headers without a complete component table", () => {
+  const missingCount = Uint8Array.from(makeJpeg(100, 100));
+  missingCount[4] = 0x00;
+  missingCount[5] = 0x07;
+  assert.match(expectFail(missingCount), /component count/);
+
+  const missingTable = Uint8Array.from(makeJpeg(100, 100));
+  missingTable[11] = 0x02;
+  assert.match(expectFail(missingTable), /component table/);
+});
+
+test("rejects unsupported lossless and differential JPEG frame variants", () => {
+  for (const marker of [0xc3, 0xc7, 0xcb, 0xcf]) {
+    const jpeg = Uint8Array.from(makeJpeg(100, 100));
+    jpeg[3] = marker;
+    assert.match(expectFail(jpeg), /unsupported JPEG frame type/);
+  }
+});

@@ -45,6 +45,13 @@ function chunkTypeEquals(buf: Uint8Array, offset: number, type: string): boolean
 
 /** Legal PNG colour types (spec: 0 gray, 2 RGB, 3 palette, 4 gray+alpha, 6 RGBA). */
 const PNG_COLOR_TYPES: ReadonlySet<number> = new Set([0, 2, 3, 4, 6]);
+const PNG_BIT_DEPTHS_BY_COLOR_TYPE: Readonly<Record<number, readonly number[]>> = {
+  0: [1, 2, 4, 8, 16],
+  2: [8, 16],
+  3: [1, 2, 4, 8],
+  4: [8, 16],
+  6: [8, 16],
+};
 
 function parsePng(buf: Uint8Array): ParseResult {
   // Signature (8) + length (4) + "IHDR" (4) + data (13) + CRC (4) = 33.
@@ -70,6 +77,10 @@ function parsePng(buf: Uint8Array): ParseResult {
   }
   if (!PNG_COLOR_TYPES.has(colorType)) {
     return { ok: false, reason: `corrupt PNG: invalid color type ${colorType}` };
+  }
+  const bitDepth = buf[24]!;
+  if (!PNG_BIT_DEPTHS_BY_COLOR_TYPE[colorType]!.includes(bitDepth)) {
+    return { ok: false, reason: `corrupt PNG: invalid bit depth ${bitDepth} for color type ${colorType}` };
   }
 
   let hasAlpha = colorType === 4 || colorType === 6;
@@ -110,6 +121,7 @@ function isSofMarker(marker: number): boolean {
   return marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
 }
 
+
 function parseJpeg(buf: Uint8Array): ParseResult {
   let i = 2; // past SOI
   while (true) {
@@ -134,11 +146,23 @@ function parseJpeg(buf: Uint8Array): ParseResult {
     if (segmentLength < 2) return { ok: false, reason: "invalid JPEG segment length" };
 
     if (isSofMarker(marker)) {
+      if (marker !== 0xc0 && marker !== 0xc1 && marker !== 0xc2) {
+        return { ok: false, reason: `unsupported JPEG frame type SOF${marker - 0xc0}` };
+      }
       // Segment layout after the marker: length (2), precision (1),
-      // height (2), width (2). The declared length must cover those five
-      // payload bytes; do not read past what the segment claims to contain.
-      if (segmentLength < 7) return { ok: false, reason: "invalid JPEG frame header length" };
-      if (j + 7 >= buf.length) return { ok: false, reason: "truncated JPEG (frame header)" };
+      // height (2), width (2), component count (1), then 3 bytes per component.
+      if (segmentLength < 8) return { ok: false, reason: "invalid JPEG frame header length: missing component count" };
+      const segmentEnd = j + 1 + segmentLength;
+      if (segmentEnd > buf.length) {
+        return { ok: false, reason: "truncated JPEG (frame segment exceeds file bounds)" };
+      }
+      const componentCount = buf[j + 8]!;
+      if (componentCount === 0) {
+        return { ok: false, reason: "invalid JPEG frame header: component count is zero" };
+      }
+      if (segmentLength !== 8 + componentCount * 3) {
+        return { ok: false, reason: "invalid JPEG frame header: incomplete component table" };
+      }
       const height = readU16BE(buf, j + 4);
       const width = readU16BE(buf, j + 6);
       if (width === 0 || height === 0) {

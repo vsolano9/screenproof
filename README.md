@@ -79,8 +79,8 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `screenshot-unreadable` | error | A locale folder exists but cannot be read (permissions, or deleted mid-scan). |
 | `screenshot-unknown-dimensions` | error | An image's pixel size matches no known App Store size (the classic late-upload failure). The finding names the closest valid size. |
 | `screenshot-count-over` | error | More than 10 screenshots resolve to one device size in one locale (orientations combined). |
-| `screenshot-format` | error | A `.png`/`.jpg`/`.jpeg` file whose header does not parse (corrupt, truncated, or mislabeled, like HEIC bytes behind a `.png` name). |
-| `screenshot-png-alpha` | warning | A PNG declares transparency through an alpha colour type or `tRNS` chunk. App Store Connect may reject transparency. |
+| `screenshot-format` | error | A `.png`/`.jpg`/`.jpeg` file has an invalid or unsupported header, including impossible PNG bit-depth/colour-type combinations and unsupported JPEG frame types. |
+| `screenshot-png-alpha` | error | A PNG declares an alpha channel or transparency through a `tRNS` chunk. App Store screenshots must not contain alpha channels or transparency. |
 | `screenshot-unexpected-file` | warning | A visible non-image file sits in a locale folder, or files sit directly in the screenshots root. |
 | `screenshot-unknown-locale` | warning | A folder name is not a known App Store locale (catches `en_US`-style typos; also flags `default/`, which deliver does not support for screenshots). |
 | `screenshot-locale-empty` | warning | A locale folder has no screenshots or app previews; with `--metadata`, also a metadata locale with no screenshots folder. |
@@ -260,7 +260,7 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 ## Known limitations
 
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
-- Rare JPEG variants outside baseline, extended, and progressive surface as parse findings rather than being silently accepted.
+- JPEG validation covers bounded baseline, extended-sequential, and progressive frame headers (SOF0/1/2). It rejects other SOF variants and structurally incomplete frame headers, but does not decode entropy-coded image data.
 - The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
 - Rotation matrices are not exposed because Apple publishes no rotation-matrix requirement to enforce. Progressive/interlaced video and target bit rate remain deliberately unchecked for the reasons above.
 - A malformed app preview with a `moov` atom larger than 64 MB is rejected to keep validation memory-bounded.

@@ -7,7 +7,7 @@ export const DEFAULT_RULES: Readonly<Record<string, RuleLevel>> = {
   "screenshot-unknown-dimensions": "error",
   "screenshot-count-over": "error",
   "screenshot-format": "error",
-  "screenshot-png-alpha": "warning",
+  "screenshot-png-alpha": "error",
   "screenshot-unexpected-file": "warning",
   "screenshot-unknown-locale": "warning",
   "screenshot-locale-empty": "warning",
