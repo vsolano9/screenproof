@@ -110,7 +110,7 @@ app.innerHTML = `
       </div>
       <p id="export-status" class="report-help" role="status"></p>
       <p class="report-help">Check a full folder in your terminal: <code>npx screenproof &lt;folder&gt;</code></p>
-      <p class="report-help">A pass covers enabled local checks, not App Store approval. <a href="https://github.com/vsolano9/screenproof#limitations">See coverage and limitations.</a></p>
+      <p class="report-help">A pass covers enabled local checks, not App Store approval. <a href="https://github.com/vsolano9/screenproof#known-limitations">See coverage and limitations.</a></p>
     </section>
   </main>
   <footer>

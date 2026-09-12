@@ -26,8 +26,14 @@ called out below.
 ### Changed
 
 - **A tree that passed 0.6.0 can fail this release.** PNG alpha/transparency is
-  now an error by default; malformed PNG/JPEG headers, disguised MP3 audio, and
-  unsupported 64-bit PCM no longer pass their corresponding checks.
+  now an error by default; malformed PNG/JPEG headers, unsupported JPEG frame
+  types (anything other than SOF0/1/2), disguised MP3 audio, and unsupported
+  64-bit PCM no longer pass their corresponding checks.
+- iPad 12.9-inch classification now mirrors fastlane's exact predicates
+  (`app_ipad_pro_129`, or `12.9` together with `2nd generation`). Near-miss
+  names such as `ipad_pro_129-1.png` stay in the 13-inch bucket, so a locale
+  that previously split into two under-cap buckets can now report
+  `screenshot-count-over`.
 - App-preview audio validation reads the MPEG-4 audio object type and QuickTime
   sound-description version/format flags instead of trusting the `mp4a` sample
   entry or a single nominal bit-depth field.
@@ -38,7 +44,8 @@ called out below.
 - CLI image reads use a bounded 1 MiB header. Browser reads run two files
   concurrently, seek late `moov` metadata within a 64 MiB limit, reject
   over-500 MB previews before payload reads, and cap cumulative slices at
-  128 MiB.
+  128 MiB. An image whose pre-image metadata exceeds the header budget fails
+  with an explicit budget reason rather than a truncation claim.
 - The browser verdict consumes the report gate for PASS, PASS WITH WARNINGS,
   and FAIL, and discloses unknown-metadata checks separately.
 

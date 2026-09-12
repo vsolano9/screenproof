@@ -161,10 +161,10 @@ The crop-frame draw and one-row scan use `duration-base` with `ease-entrance`; h
 
 - `default` — designed: empty input and an explanation in the results pane.
 - `hover/press` — designed: file target line strengthens; buttons translate by one token-safe pixel-free inset effect.
-- `focus-visible` — designed: 2px `primary` outline at 2px offset on every control and link.
-- `disabled` — designed: fixture controls disable during byte reads and retain labels.
+- `focus-visible` — verified: 2px `primary` outline at 2px offset on every control and link, including the visible Choose files and Choose folder buttons.
+- `disabled` — designed: example and chooser controls disable during byte reads and retain labels; Clear stays enabled so a selection can always be abandoned.
 - `loading` — designed: selected filename plus `Inspecting locally…`, no spinner.
-- `empty` — designed: `Drop files or choose a synthetic fixture` and no fake result rows.
+- `empty` — verified: `No files selected` with `Try an example or check your own files. Nothing is uploaded.` and no fake result rows.
 - `sparse` — designed: one file still shows the complete rule matrix.
 - `error` — designed: FAIL word, rule id, and reason in one row.
 - `validation` — designed: unreadable or unsupported files produce `screenshot-format` or `preview-format`.
