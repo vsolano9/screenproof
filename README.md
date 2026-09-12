@@ -235,6 +235,16 @@ Browser file inputs cannot represent empty directories, so a completely empty
 locale folder cannot be diagnosed individually. An empty or text-only selection
 does not produce a clean result.
 
+The hosted inspector reads at most two files concurrently. Images use a 1 MiB
+header slice; previews seek over encoded media to read only movie metadata,
+including a late `moov` atom (64 MiB maximum). Previews above Apple's 500 MB
+limit are rejected before reading their payload. A selection has a 128 MiB
+cumulative slice budget, not counting browser-managed `File` storage and report
+objects; selecting fewer files or using the CLI recovers from a budget error.
+Unusually large pre-image metadata beyond the 1 MiB image header budget fails
+conservatively rather than implying that transparency was checked. The CLI
+also reads 1 MiB image heads and seeks preview metadata, one file at a time.
+
 
 ## Flat mode
 

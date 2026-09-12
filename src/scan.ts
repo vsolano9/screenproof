@@ -11,7 +11,7 @@
  * the missing/empty-root diagnostics.
  */
 
-import { readdir, readFile, stat } from "node:fs/promises";
+import { open, readdir, stat } from "node:fs/promises";
 import { dirname, basename, join } from "node:path";
 
 import { parseImageHeader } from "./imageheader.ts";
@@ -65,10 +65,22 @@ async function entryKind(dir: string, entry: DirEntry): Promise<EntryKind> {
 async function scanImage(dir: string, name: string, locale: string): Promise<ScreenshotFile> {
   const path = join(dir, name);
   let parse: ScreenshotFile["parse"];
+  let handle;
   try {
-    parse = parseImageHeader(new Uint8Array(await readFile(path)));
+    handle = await open(path, "r");
+    const { size } = await handle.stat();
+    const bytes = Buffer.allocUnsafe(Math.min(size, 1024 * 1024));
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await handle.read(bytes, offset, bytes.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    parse = parseImageHeader(bytes.subarray(0, offset), size);
   } catch (err) {
     parse = { ok: false, reason: `could not read file: ${(err as Error).message}` };
+  } finally {
+    await handle?.close();
   }
   return { path, name, locale, parse };
 }
