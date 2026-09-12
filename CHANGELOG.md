@@ -10,6 +10,10 @@ called out below.
 
 ### Added
 
+- A responsive light/blue inspector based on the approved design, with real
+  asset summaries, locale/device filters, search, grouped file findings,
+  distinct review states, explicit coverage and a copyable CLI command.
+
 - Reports now expose an effective `gate` (`pass`, `pass-with-warnings`, or
   `fail`) and list unavailable frame-rate, H.264, audio-codec, and PCM-depth
   measurements in `unverifiedChecks`; `ok` retains its no-error meaning.

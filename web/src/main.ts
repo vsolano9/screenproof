@@ -1,129 +1,29 @@
-import { inspectBrowserFixtures } from "../../src/browser.ts";
-import type { Finding, LintReport } from "../../src/types.ts";
+import { inspectBrowserSelection } from "../../src/browser.ts";
+import type { LintReport } from "../../src/types.ts";
 import { Inspection, readDrop } from "./intake.ts";
 import { readFiles } from "./file-read.ts";
 
-import "./tokens.generated.css";
+import { shell, exampleFiles } from "./shell.ts";
+import { assetRows, presentation, type AssetRow } from "./report-model.ts";
+import { reportView, filteredFindings, type Filters } from "./report-view.ts";
 import "./styles.css";
 
-interface FixtureDefinition {
-  id: string;
-  label: string;
-  detail: string;
-  source: string;
-  path?: string;
-}
-
-const fixtures: readonly FixtureDefinition[] = [
-  {
-    id: "wrong-size",
-    label: "Wrong size",
-    detail: "1170 × 2500 PNG",
-    source: "/fixtures/wrong-size-1170x2500.png",
-  },
-  {
-    id: "valid-size",
-    label: "Accepted size",
-    detail: "1320 × 2868 PNG",
-    source: "/fixtures/correct-1320x2868.png",
-  },
-  {
-    id: "wrong-locale",
-    label: "Wrong locale folder",
-    detail: "en_US/01.png",
-    source: "/fixtures/correct-1320x2868.png",
-    path: "en_US/01.png",
-  },
-];
+const fixtures = exampleFiles;
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("missing app root");
 
-app.innerHTML = `
-  <header class="site-header">
-    <a class="wordmark" href="https://github.com/vsolano9/screenproof">screenproof</a>
-    <span class="product-name">App Store media inspector</span>
-    <span class="runtime-note">local only · no uploads</span>
-    <nav aria-label="Project links">
-      <a href="https://github.com/vsolano9/screenproof">GitHub</a>
-      <a href="https://www.npmjs.com/package/screenproof">npm</a>
-    </nav>
-  </header>
-  <main class="workspace">
-    <section class="input-panel" aria-labelledby="input-heading">
-      <div class="section-heading">
-        <span aria-hidden="true">1.</span>
-        <div>
-          <h1 id="input-heading">Check App Store screenshots and previews</h1>
-          <p>Drop screenshots, app previews, or a locale folder.</p>
-        </div>
-      </div>
-
-      <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-describedby="local-note">
-        <span class="crop crop-nw" aria-hidden="true"></span>
-        <span class="crop crop-ne" aria-hidden="true"></span>
-        <span class="crop crop-sw" aria-hidden="true"></span>
-        <span class="crop crop-se" aria-hidden="true"></span>
-        <div class="file-glyph" aria-hidden="true"><span></span></div>
-        <strong>Drop files or a folder here</strong>
-        <span>PNG, JPEG, MOV, M4V, or MP4</span>
-        <p id="local-note">All processing stays in your browser.</p>
-      </div>
-
-      <div class="chooser-row">
-        <button class="button primary" type="button" id="choose-files">Choose files</button>
-        <input id="file-input" type="file" multiple accept=".png,.jpg,.jpeg,.mov,.m4v,.mp4" hidden />
-        <button class="button secondary" type="button" id="choose-folder">Choose folder</button>
-        <input id="folder-input" type="file" multiple webkitdirectory hidden />
-      </div>
-
-      <h2 class="fixture-heading">Try an example</h2>
-      <div class="fixture-list" id="fixture-list">
-        ${fixtures.map((fixture) => `
-          <button type="button" class="fixture-button" data-fixture="${fixture.id}" aria-pressed="false">
-            <span>${fixture.label}</span>
-            <small>${fixture.detail}</small>
-          </button>
-        `).join("")}
-      </div>
-    </section>
-
-    <section class="results-panel" aria-labelledby="results-heading">
-      <div class="section-heading">
-        <span aria-hidden="true">2.</span>
-        <div>
-          <h2 id="results-heading">Inspection</h2>
-          <p>Same parsers, rules, and reasons as the CLI.</p>
-        </div>
-      </div>
-      <div id="results" class="results-body" aria-live="polite">
-        <div class="empty-state">
-          <div class="empty-frame" aria-hidden="true"></div>
-          <h3>No files selected</h3>
-          <p>Try an example or check your own files. Nothing is uploaded.</p>
-        </div>
-      </div>
-      <div class="report-actions" aria-label="Report actions">
-        <button type="button" class="button secondary" id="copy-json" disabled>Copy JSON</button>
-        <button type="button" class="button secondary" id="download-json" disabled>Download JSON</button>
-        <button type="button" class="button secondary" id="clear">Clear</button>
-      </div>
-      <p id="export-status" class="report-help" role="status"></p>
-      <p class="report-help">Check a full folder in your terminal: <code>npx screenproof &lt;folder&gt;</code></p>
-      <p class="report-help">A pass covers enabled local checks, not App Store approval. <a href="https://github.com/vsolano9/screenproof#known-limitations">See coverage and limitations.</a></p>
-    </section>
-  </main>
-  <footer>
-    <span>screenproof browser inspector</span>
-    <span>offline rules · no telemetry · MIT</span>
-  </footer>
-`;
+app.innerHTML = shell();
 
 const results = requiredElement<HTMLDivElement>("#results");
 const fileInput = requiredElement<HTMLInputElement>("#file-input");
 const folderInput = requiredElement<HTMLInputElement>("#folder-input");
 const dropZone = requiredElement<HTMLDivElement>("#drop-zone");
 const emptyResults = results.innerHTML;
+const scanStatus = requiredElement<HTMLParagraphElement>("#scan-status");
+const clearButton = requiredElement<HTMLButtonElement>("#clear");
+let currentRows: AssetRow[] = [];
+let filters: Filters = { locale: "*", device: "*", search: "", issues: false };
 const copyButton = requiredElement<HTMLButtonElement>("#copy-json");
 const downloadButton = requiredElement<HTMLButtonElement>("#download-json");
 const exportStatus = requiredElement<HTMLParagraphElement>("#export-status");
@@ -132,24 +32,49 @@ const inspection = new Inspection({
   start: beginInspection,
   complete: async (files, current) => {
     const inputs = await readFiles(files, current);
-    if (current()) renderReport(inspectBrowserFixtures(inputs), inputs.map(input => input.path ?? input.name));
+    if (current()) {
+      const { scan, report } = inspectBrowserSelection(inputs);
+      renderReport(report, assetRows(scan, report), inputs.length);
+    }
   },
   error: renderReadError,
 });
 
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture]")) {
-  button.addEventListener("click", () => void loadFixture(button.dataset.fixture ?? ""));
+for (const button of document.querySelectorAll<HTMLButtonElement>(
+  "[data-fixture]",
+)) {
+  button.addEventListener(
+    "click",
+    () => void loadFixture(button.dataset.fixture ?? ""),
+  );
 }
 
-fileInput.addEventListener("change", () => void inspectFiles([...fileInput.files ?? []]));
-folderInput.addEventListener("change", () => void inspectFiles([...folderInput.files ?? []]));
-requiredElement<HTMLButtonElement>("#choose-files").addEventListener("click", () => fileInput.click());
-requiredElement<HTMLButtonElement>("#choose-folder").addEventListener("click", () => folderInput.click());
+fileInput.addEventListener("change", () => {
+  const files = [...(fileInput.files ?? [])];
+  fileInput.value = "";
+  if (files.length) void inspectFiles(files);
+});
+folderInput.addEventListener("change", () => {
+  const files = [...(folderInput.files ?? [])];
+  folderInput.value = "";
+  if (files.length) void inspectFiles(files);
+});
+requiredElement<HTMLButtonElement>("#choose-files").addEventListener(
+  "click",
+  () => fileInput.click(),
+);
+requiredElement<HTMLButtonElement>("#choose-folder").addEventListener(
+  "click",
+  () => folderInput.click(),
+);
 
 requiredElement<HTMLButtonElement>("#clear").addEventListener("click", () => {
   inspection.cancel();
   currentReport = undefined;
   results.innerHTML = emptyResults;
+  currentRows = [];
+  clearButton.disabled = true;
+  scanStatus.textContent = "Selection cleared.";
   fileInput.value = "";
   folderInput.value = "";
   setSelectedFixture("");
@@ -164,12 +89,18 @@ copyButton.addEventListener("click", async () => {
     await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
     if (currentReport === report) exportStatus.textContent = "JSON copied.";
   } catch {
-    if (currentReport === report) exportStatus.textContent = "Clipboard access is unavailable. Use Download JSON instead.";
+    if (currentReport === report)
+      exportStatus.textContent =
+        "Clipboard access is unavailable. Use Download JSON instead.";
   }
 });
 downloadButton.addEventListener("click", () => {
   if (!currentReport) return;
-  const url = URL.createObjectURL(new Blob([JSON.stringify(currentReport, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(currentReport, null, 2)], {
+      type: "application/json",
+    }),
+  );
   const link = document.createElement("a");
   link.href = url;
   link.download = "screenproof-report.json";
@@ -179,12 +110,12 @@ downloadButton.addEventListener("click", () => {
   exportStatus.textContent = "JSON download started.";
 });
 
-dropZone.addEventListener("click", () => fileInput.click());
-dropZone.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
+dropZone.addEventListener("click", (event) => {
+  if (
+    !(event.target instanceof Element && event.target.closest("button")) &&
+    !fileInput.disabled
+  )
     fileInput.click();
-  }
 });
 for (const type of ["dragenter", "dragover"] as const) {
   dropZone.addEventListener(type, (event) => {
@@ -200,99 +131,121 @@ for (const type of ["dragleave", "drop"] as const) {
 }
 dropZone.addEventListener("drop", (event) => {
   setSelectedFixture("");
-  void inspection.run("local folder", current => readDrop(event.dataTransfer, current));
+  void inspection.run("local folder", (current) =>
+    readDrop(event.dataTransfer, current),
+  );
 });
 
 const requestedFixture = new URLSearchParams(location.search).get("fixture");
-if (requestedFixture && fixtures.some((fixture) => fixture.id === requestedFixture)) {
+if (
+  requestedFixture &&
+  fixtures.some((fixture) => fixture.id === requestedFixture)
+) {
   void loadFixture(requestedFixture);
 }
 
 async function loadFixture(id: string): Promise<void> {
-  const fixture = fixtures.find(candidate => candidate.id === id);
+  const fixture = fixtures.find((candidate) => candidate.id === id);
   if (!fixture) return;
   setSelectedFixture(id);
-  await inspection.run(fixture.label, async current => {
+  await inspection.run(fixture.label, async (current) => {
     const response = await fetch(fixture.source);
     if (!current()) return [];
-    if (!response.ok) throw new Error(`example request returned ${response.status}`);
-    const file = new File([await response.blob()], fixture.path?.split("/").at(-1) ?? fixture.source.split("/").at(-1)!);
-    if (fixture.path) Object.defineProperty(file, "webkitRelativePath", { value: `example/${fixture.path}` });
+    if (!response.ok)
+      throw new Error(`example request returned ${response.status}`);
+    const file = new File(
+      [await response.blob()],
+      fixture.path?.split("/").at(-1) ?? fixture.source.split("/").at(-1)!,
+    );
+    if (fixture.path)
+      Object.defineProperty(file, "webkitRelativePath", {
+        value: `example/${fixture.path}`,
+      });
     return [file];
   });
 }
 
 async function inspectFiles(files: readonly File[]): Promise<void> {
   setSelectedFixture("");
-  await inspection.run(files.length === 1 ? files[0]!.name : `${files.length} files`, async () => [...files]);
+  await inspection.run(
+    files.length === 1 ? files[0]!.name : `${files.length} files`,
+    async () => [...files],
+  );
 }
 
 function beginInspection(label: string): void {
   currentReport = undefined;
   copyButton.disabled = downloadButton.disabled = true;
   exportStatus.textContent = "";
+  clearButton.disabled = false;
+  scanStatus.textContent = "Inspecting locally.";
   results.innerHTML = `<div class="loading-state"><span>Inspecting locally</span><strong>${escapeHtml(label)}</strong></div>`;
   setControlsDisabled(true);
 }
 
-function renderReport(report: LintReport, paths: readonly string[]): void {
+function renderReport(
+  report: LintReport,
+  rows: AssetRow[],
+  selected: number,
+): void {
   setControlsDisabled(false);
   currentReport = report;
-  copyButton.disabled = downloadButton.disabled = false;
-  const gate = report.gate;
-  const status = gate === "fail" ? "FAIL" : gate === "pass-with-warnings" ? "PASS WITH WARNINGS" : "PASS";
-  const summary = gate === "fail"
-    ? `${report.errorCount} error${report.errorCount === 1 ? " blocks" : "s block"} this selection.`
-    : gate === "pass-with-warnings" ? "Review the warnings before uploading." : "No enabled error or warning rule fired.";
-  const rows = report.findings.length > 0
-    ? report.findings.map((finding) => findingRow(finding)).join("")
-    : `<tr class="result-success"><td data-label="Result"><strong>PASS</strong></td><td data-label="File">${escapeHtml(paths.join(", "))}</td><td data-label="Rule"><code>all enabled rules</code></td><td data-label="Why it needs attention">No enabled error or warning rule fired.</td></tr>`;
-  results.innerHTML = `
-    <div class="verdict is-${gate}" data-testid="verdict">
-      <div>
-        <span>Selected files</span>
-        <h3>${escapeHtml(paths.length === 1 ? paths[0]! : `${paths.length} files`)}</h3>
-      </div>
-      <div class="verdict-lockup"><strong>${status}</strong><span>${escapeHtml(summary)}</span></div>
-    </div>
-    <div class="matrix-wrap">
-      <table class="result-matrix">
-        <thead><tr><th>Result</th><th>File</th><th>Rule</th><th>Why it needs attention</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <div class="report-note">
-      <strong>${report.mode === "locale" ? "Locale tree" : "Flat files"}</strong>
-      <span>${report.warningCount} warning${report.warningCount === 1 ? "" : "s"} · ${report.errorCount} error${report.errorCount === 1 ? "" : "s"}</span>
-    </div>
-    ${report.unverifiedChecks.length ? `<div class="report-help"><strong>Not verified from available metadata</strong><ul>${report.unverifiedChecks.map(check => `<li>${escapeHtml(check.file ?? check.locale)}: ${escapeHtml(check.reason)} <code>${escapeHtml(check.check)}</code></li>`).join("")}</ul></div>` : ""}
-  `;
+  currentRows = rows;
+  copyButton.disabled = downloadButton.disabled = clearButton.disabled = false;
+  filters = {
+    locale: "*",
+    device: "*",
+    search: "",
+    issues: report.findings.length > 0 || report.unverifiedChecks.length > 0,
+  };
+  results.innerHTML = reportView(report, rows, selected);
+  refreshFindings();
+  scanStatus.textContent = `${presentation(report).title}. ${rows.length} assets, ${report.errorCount} errors, ${report.warningCount} warnings.`;
 }
-
-function findingRow(finding: Finding): string {
-  const result = finding.severity === "error" ? "FAIL" : finding.severity === "warning" ? "WARN" : "INFO";
-  return `<tr class="result-${finding.severity}" data-rule="${escapeHtml(finding.rule)}">
-    <td data-label="Result"><strong>${result}</strong></td>
-    <td data-label="File">${escapeHtml(finding.file ?? (finding.locale || "selection"))}</td>
-    <td data-label="Rule"><code>${escapeHtml(finding.rule)}</code></td>
-    <td data-label="Why it needs attention">${escapeHtml(finding.message)}</td>
-  </tr>`;
+function refreshFindings(): void {
+  if (!currentReport) return;
+  requiredElement<HTMLDivElement>("#finding-list").innerHTML = filteredFindings(
+    currentRows,
+    currentReport,
+    filters,
+  );
+  for (const button of results.querySelectorAll<HTMLButtonElement>(
+    "[data-view]",
+  )) {
+    button.setAttribute(
+      "aria-pressed",
+      String((button.dataset.view === "issues") === filters.issues),
+    );
+  }
 }
 
 function renderReadError(label: string, error: unknown): void {
   setControlsDisabled(false);
+  clearButton.disabled = false;
+  scanStatus.textContent =
+    "The selection could not be inspected. Choose files again or select fewer files.";
   results.innerHTML = `<div class="read-error"><strong>Could not inspect ${escapeHtml(label)}</strong><p>${escapeHtml(error instanceof Error ? error.message : String(error))}</p></div>`;
-  results.insertAdjacentHTML("beforeend", `<p class="recovery-note">Choose your files again, or select fewer files. Nothing was uploaded.</p>`);
+  results.insertAdjacentHTML(
+    "beforeend",
+    `<p class="recovery-note">Choose your files again, or select fewer files. Nothing was uploaded.</p>`,
+  );
 }
 
 function setSelectedFixture(id: string): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture]")) {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "[data-fixture]",
+  )) {
     button.setAttribute("aria-pressed", String(button.dataset.fixture === id));
   }
 }
 
 function setControlsDisabled(disabled: boolean): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-fixture], #choose-files, #choose-folder")) button.disabled = disabled;
+  results.setAttribute("aria-busy", String(disabled));
+  dropZone.classList.toggle("is-busy", disabled);
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "[data-fixture], #choose-files, #choose-folder",
+  ))
+    button.disabled = disabled;
   fileInput.disabled = disabled;
   folderInput.disabled = disabled;
 }
@@ -308,3 +261,38 @@ function escapeHtml(value: string): string {
   node.textContent = value;
   return node.innerHTML;
 }
+
+results.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(
+    target instanceof HTMLInputElement || target instanceof HTMLSelectElement
+  ))
+    return;
+  if (target.id === "filter-locale") filters.locale = target.value;
+  else if (target.id === "filter-device") filters.device = target.value;
+  else if (target.id === "filter-search") filters.search = target.value;
+  else return;
+  refreshFindings();
+});
+results.addEventListener("click", (event) => {
+  const button =
+    event.target instanceof Element
+      ? event.target.closest<HTMLButtonElement>("[data-view]")
+      : null;
+  if (!button) return;
+  filters.issues = button.dataset.view === "issues";
+  refreshFindings();
+});
+requiredElement<HTMLButtonElement>("#copy-command").addEventListener(
+  "click",
+  async () => {
+    try {
+      await navigator.clipboard.writeText("npx screenproof <folder>");
+      exportStatus.textContent =
+        "CLI command copied. Replace <folder> with your assets folder.";
+    } catch {
+      exportStatus.textContent =
+        "Clipboard unavailable. Select and copy the command from the terminal panel.";
+    }
+  },
+);
