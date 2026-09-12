@@ -41,7 +41,7 @@ export function shell(): string {
     <section class="hero" aria-labelledby="hero-heading"><div class="hero-copy"><h1 id="hero-heading">Ship App Store assets<br>with confidence.</h1>
       <p>Check your screenshots and app previews before App Store Connect does. Catch issues early, fix them fast. Your files never leave your device.</p>
       <div class="benefits"><div>${icon("lock")}<span><strong>100% local processing</strong><small>Your assets stay on your device</small></span></div><div>${icon("shield")}<span><strong>Built for developers</strong><small>Open source and transparent</small></span></div><div>${icon("bolt")}<span><strong>Fewer surprises</strong><small>Catch issues before submission</small></span></div></div>
-    </div><div class="hero-art" aria-hidden="true"><img src="/validation-stack.webp" width="1344" height="448" alt="" fetchpriority="high" decoding="async"></div></section>
+    </div><div class="hero-art" aria-hidden="true"><img src="/validation-stack-transparent.webp" width="1344" height="464" alt="" fetchpriority="high" decoding="async"></div></section>
     <div class="workspace" id="inspector" tabindex="-1">
       <div class="input-column">
         <section class="panel input-panel" aria-labelledby="input-heading"><h2 id="input-heading">${icon("upload")}Add your assets</h2>
