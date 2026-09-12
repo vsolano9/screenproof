@@ -151,6 +151,11 @@ export interface Finding {
   message: string;
 }
 
+/**
+ * A measurement the file's metadata did not support. Most such checks are
+ * simply skipped; `preview-audio-codec` additionally fails conservatively,
+ * because an unidentifiable codec is not evidence of AAC.
+ */
 export interface UnverifiedCheck {
   locale: string;
   file?: string;
@@ -179,7 +184,7 @@ export interface LintReport {
   ok: boolean;
   /** Effective validation gate, including strict warning policy when requested. */
   gate: GateStatus;
-  /** Checks skipped because the required metadata was absent or unknown. */
+  /** Checks the available metadata could not establish. See `UnverifiedCheck`. */
   unverifiedChecks: UnverifiedCheck[];
 }
 

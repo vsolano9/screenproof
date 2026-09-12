@@ -22,6 +22,9 @@ called out below.
   H.264/AAC control.
 - `UPCOMING_CLASSES` records Apple-published iPhone Duo outer and inner display
   dimensions separately from the currently uploadable default table.
+- The README publishes a coverage table separating checked, checked-when-
+  present, conservatively-checked, partial-folder, and out-of-scope
+  requirements, and corrects the AAC bitrate and JPEG support statements.
 
 ### Changed
 

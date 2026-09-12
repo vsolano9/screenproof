@@ -112,13 +112,16 @@ Enable the opt-in rules via config: `{ "rules": { "screenshot-locale-parity": "w
 
 `PASS` means no enabled rule produced an error. `PASS WITH WARNINGS` means no
 errors but at least one warning. Neither verdict claims that unavailable or
-out-of-scope properties conform. The JSON report lists skipped measurements in
-`unverifiedChecks`, separately from findings.
+out-of-scope properties conform. The JSON report names every measurement the
+available metadata could not establish in `unverifiedChecks`, separately from
+findings. Most of those measurements are skipped; an unidentifiable audio
+codec also fails `preview-audio-codec`, because it is not evidence of AAC.
 
 | Status | Requirements | Behavior |
 | --- | --- | --- |
 | Checked | Exact screenshot/preview dimensions; PNG/JPEG headers and declared PNG transparency; per-size counts; Watch-size consistency; preview container, video and audio codec, file size, duration, resolution, audio layout/sample rate, and track-enabled flags | Enforced by the rules above and covered by fixture-backed tests. |
-| Checked when present | Preview frame rate (`stts`), H.264 profile/level (`avcC`), MPEG-4 audio object type (`esds`), and PCM bit depth (QuickTime sound description) | Enforced when the required container metadata exists; otherwise named in `unverifiedChecks`. |
+| Checked when present | Preview frame rate (`stts`), H.264 profile/level (`avcC`), and PCM bit depth (QuickTime sound description) | Enforced when the required container metadata exists; otherwise named in `unverifiedChecks` and not judged. |
+| Checked conservatively | MPEG-4 audio object type (`esds`) | An `mp4a` entry with no identifiable object type fails `preview-audio-codec` and is also named in `unverifiedChecks`. |
 | Not verifiable from a partial folder | Whether every remote App Store slot has an asset, and whether the same-resolution file belongs to every possible mixed-platform slot | Counts use Apple's resolution groups. A local folder proves only what it contains. |
 | Out of scope | EXIF orientation transforms, rotation matrices, progressive/interlaced decoding, AAC 256 kbps and target video bitrate, and full image/video decoding | Reported here rather than guessed from file size or incomplete metadata. |
 
