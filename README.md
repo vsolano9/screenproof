@@ -62,14 +62,14 @@ If `path` is omitted, screenproof looks for `./fastlane/screenshots`, then `./sc
 | `--config <file>` | JSON config to override rules, locales, and the dimension table. |
 | `--metadata <folder>` | deliver `metadata/` folder to cross-check against a locale tree: warns when a metadata locale has no screenshots. Cannot be combined with explicit `--flat`. |
 | `--flat` | Treat the path as a flat folder of images (file-level checks only). |
-| `--strict` | Exit non-zero on warnings as well as errors. |
-| `--json` | Print the report as JSON. |
+| `--strict` | Make warnings fail the effective `gate` as well as errors. |
+| `--json` | Print the complete report, including `ok`, effective `gate`, findings, and unverified checks, as JSON. |
 | `--quiet` | Hide clean locales and info findings. |
 | `--no-color` | Disable ANSI color (also respects `NO_COLOR`). |
 | `-h, --help` | Show help. |
 | `-v, --version` | Show the version. |
 
-Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage or config error.
+Exit codes: `0` effective gate passed, `1` effective gate failed, `2` usage or config error. Warnings produce `pass-with-warnings` normally and `fail` under `--strict`.
 
 ## Rules
 
@@ -93,33 +93,34 @@ Exit codes: `0` clean, `1` lint errors (or warnings under `--strict`), `2` usage
 | `preview-duration` | error | An app preview is shorter than 15 seconds or longer than 30 seconds. |
 | `preview-resolution` | error | Video display dimensions do not match an accepted App Store app-preview resolution. |
 | `preview-count-over` | error | A localization contains more than three app previews for one device size. Apple's cap is three "per supported device size and language", so iPhone and iPad previews have separate budgets; portrait and landscape share one, since they are the same upload slot. |
-| `preview-frame-rate` | error | An app preview runs faster than Apple's 30 fps maximum. A 60 fps simulator recording is the usual cause. |
-| `preview-h264-profile` | error | H.264 above High Profile Level 4.0, read from the `avcC` box. |
+| `preview-frame-rate` | error | An app preview runs faster than Apple's 30 fps maximum when the sample table exposes a frame rate. A 60 fps simulator recording is the usual cause. |
+| `preview-h264-profile` | error | H.264 above High Profile Level 4.0 when the file exposes an `avcC` configuration box. |
 | `preview-audio-missing` | error | An app preview has no audio track. Apple requires stereo audio, and a silent screen recording is the usual cause. |
 | `preview-audio-layout` | error | Audio is not stereo. Apple accepts one 2-channel track or two 1-channel tracks. |
-| `preview-audio-codec` | error | Audio is not 256 kbps AAC. PCM is accepted only alongside ProRes 422 HQ. |
+| `preview-audio-codec` | error | Audio is not AAC, or PCM is used without ProRes 422 HQ. This rule identifies the actual MPEG-4 audio object type; it does not measure Apple's 256 kbps AAC requirement. |
 | `preview-audio-sample-rate` | error | Audio is not sampled at 44.1 kHz or 48 kHz. |
-| `preview-audio-bit-depth` | error | PCM audio is not 16-, 24-, or 32-bit. Not applied to AAC. |
+| `preview-audio-bit-depth` | error | PCM audio is not 16-, 24-, or 32-bit when its sample description exposes the depth. Not applied to AAC. |
 | `preview-track-disabled` | warning | A video or audio track's `track_enabled` flag is clear. Apple writes that all tracks *should* be enabled, so this warns rather than fails. |
 
 Enable the opt-in rules via config: `{ "rules": { "screenshot-locale-parity": "warning" } }`.
 
-### Two documented requirements screenproof does not check
+### Coverage status
 
-Apple's app-preview specification lists two things this tool deliberately leaves
-alone, because reading them honestly is not possible from container metadata:
+`PASS` means no enabled rule produced an error. `PASS WITH WARNINGS` means no
+errors but at least one warning. Neither verdict claims that unavailable or
+out-of-scope properties conform. The JSON report lists skipped measurements in
+`unverifiedChecks`, separately from findings.
 
-- **Progressive vs interlaced.** Answering it means decoding the H.264 sequence
-  parameter set (`frame_mbs_only_flag`) or trusting a QuickTime `fiel` atom that
-  most encoders never write. screenproof reads structure, never encoded media.
-- **Target bit rate** (10-12 Mbps for H.264, ~220 Mbps for ProRes). Apple states
-  a target, not a limit, and a figure derived from file size over duration folds
-  in audio and container overhead. A rule built on it would warn on conforming
-  files, which is worse than no rule.
+| Status | Requirements | Behavior |
+| --- | --- | --- |
+| Checked | Exact screenshot/preview dimensions; PNG/JPEG headers and declared PNG transparency; per-size counts; Watch-size consistency; preview container, video and audio codec, file size, duration, resolution, audio layout/sample rate, and track-enabled flags | Enforced by the rules above and covered by fixture-backed tests. |
+| Checked when present | Preview frame rate (`stts`), H.264 profile/level (`avcC`), MPEG-4 audio object type (`esds`), and PCM bit depth (QuickTime sound description) | Enforced when the required container metadata exists; otherwise named in `unverifiedChecks`. |
+| Not verifiable from a partial folder | Whether every remote App Store slot has an asset, and whether the same-resolution file belongs to every possible mixed-platform slot | Counts use Apple's resolution groups. A local folder proves only what it contains. |
+| Out of scope | EXIF orientation transforms, rotation matrices, progressive/interlaced decoding, AAC 256 kbps and target video bitrate, and full image/video decoding | Reported here rather than guessed from file size or incomplete metadata. |
 
 ## Accepted sizes
 
-Verified against Apple's screenshot specifications page and fastlane deliver's source on **2026-08-23**. The shipped table is the union of both. Apple adds sizes with new hardware: if a size is missing here, extend it via `dimensions` in config the same day (see below), and expect updated releases after Apple device events.
+Verified against Apple's [screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/) and fastlane deliver's resolution source on **2026-09-12**. `DEFAULT_CLASSES` is the union of sizes currently supported by those sources; `UPCOMING_CLASSES` keeps Apple-published sizes separate until upload availability and fastlane compatibility are verified.
 
 | Class id | Device | Portrait | Landscape |
 | --- | --- | --- | --- |
@@ -139,7 +140,24 @@ Verified against Apple's screenshot specifications page and fastlane deliver's s
 | `mac` | Mac | none | 1280x800, 1440x900, 2560x1600, 2880x1800 |
 | `appletv` | Apple TV | none | 1920x1080, 3840x2160 |
 | `visionpro` | Apple Vision Pro | none | 3840x2160 (via `vision` in the file path) |
-| `watch-*` | Apple Watch (Ultra 3 to Series 3) | 422x514, 410x502, 416x496, 396x484, 368x448, 312x390 | none |
+| `watch-*` | Apple Watch (Ultra 4 to Series 1 and SE) | 422x514 (Ultra 4/3), 410x502 (Ultra 2/Ultra), 416x496 (Series 12/11/10), 396x484 (Series 9/8/7), 368x448 (Series 6/5/4, SE 3, SE 2, SE), 312x390 (Series 3/2/1) | none |
+
+Apple also documents these iPhone Duo dimensions, but its app-preview page says
+App Store Connect asset uploads for the device will become available later in
+2026, and fastlane does not yet map them. They are exposed through
+`UPCOMING_CLASSES` and deliberately fail default validation until availability
+is verified.
+
+| Upcoming class id | Display | Portrait | Landscape |
+| --- | --- | --- | --- |
+| `iphone-duo-outer` | iPhone Duo outer display | 1398x2034 | 2034x1398 |
+| `iphone-duo-inner` | iPhone Duo inner display | 2007x2853 | 2853x2007 |
+
+The deterministic source snapshots are `fixtures/dimensions-snapshot.json`,
+`fixtures/upcoming-dimensions-snapshot.json`, and
+`fixtures/preview-dimensions-snapshot.json`. A freshness review re-reads the
+linked Apple pages and fastlane mapping, then updates the dates and snapshots
+in the same change; tests intentionally do not make network requests.
 
 Apple requires one Apple Watch screenshot size to be used consistently across all localizations for an app. `screenshot-watch-size-consistency` enforces that requirement using the exact pixel sizes above; localizations without Watch screenshots are ignored.
 
@@ -147,7 +165,7 @@ Ambiguities are resolved the way deliver resolves them: keywordless `2048x2732` 
 
 ## Accepted app-preview sizes
 
-Verified against Apple's [app-preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications) on **2026-08-23**.
+Verified against Apple's [app-preview specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/app-preview-specifications/) on **2026-09-12**.
 
 | Platform family | Accepted portrait | Accepted landscape |
 | --- | --- | --- |
@@ -159,7 +177,7 @@ Verified against Apple's [app-preview specifications](https://developer.apple.co
 | Mac and Apple TV | none | 1920x1080 |
 | Apple Vision Pro | none | 3840x2160 |
 
-The repository snapshot is `fixtures/preview-dimensions-snapshot.json`.
+The preview table is pinned by the source snapshots above.
 
 ## Config
 
@@ -211,7 +229,7 @@ console.log(renderHuman(report));
 process.exit(exitCode(report, false));
 ```
 
-`scan(root, config, { forceFlat?: boolean })` walks a deliver tree or a flat folder. `validate(scan, config, { metadataLocales? })` applies the rule table. `defaultConfig()`, `mergeConfig()`, and `loadConfig()` build config. `renderHuman()`, `renderJson()`, and `exitCode()` format and gate. Header parsers (`parseImageHeader`, `parsePreviewFile`) and the dimension tables are also exported for tools that already have the bytes.
+`scan(root, config, { forceFlat?: boolean })` walks a deliver tree or a flat folder. `validate(scan, config, { metadataLocales?, strict? })` applies the rule table. `LintReport.ok` keeps its API meaning: no error findings. `LintReport.gate` is the effective `"pass"`, `"pass-with-warnings"`, or `"fail"` decision and incorporates strict warning policy. `defaultConfig()`, `mergeConfig()`, and `loadConfig()` build config. `renderHuman()`, `renderJson()`, and `exitCode()` format and gate. Header parsers (`parseImageHeader`, `parsePreviewFile`) and the current and upcoming dimension tables are also exported for tools that already have the bytes.
 
 Browser tools can import the side-effect-free entry without pulling in Node
 filesystem modules:
@@ -235,24 +253,29 @@ Point screenproof at any folder of images (no fastlane required):
 screenproof ~/Desktop/new-screenshots --flat
 ```
 
-Flat mode runs the file-level checks only (dimensions, format, alpha, preview size and duration, unexpected files); locale and count rules need a deliver tree.
+Flat mode runs the file-level checks only (dimensions, format, alpha, preview size and duration, unexpected files); locale and count rules need a deliver tree. A partial folder cannot prove that every App Store slot is populated.
 `--metadata` cannot be combined with explicit `--flat`. If screenproof auto-detects a flat folder while `--metadata` is present, it still runs the file-level checks and skips the locale comparison.
 
 ## Known limitations
 
 - EXIF orientation metadata is not applied; dimensions are read from the image frame header.
-- JPEG validation covers bounded baseline, extended-sequential, and progressive frame headers (SOF0/1/2). It rejects other SOF variants and structurally incomplete frame headers, but does not decode entropy-coded image data.
-- The dimension table reflects Apple's published sizes as of the date above, never a guarantee: a missing new size produces false errors (extend via config), and a retired size produces false passes.
-- Rotation matrices are not exposed because Apple publishes no rotation-matrix requirement to enforce. Progressive/interlaced video and target bit rate remain deliberately unchecked for the reasons above.
+- JPEG validation covers bounded baseline, extended-sequential, and progressive frame headers (SOF0/1/2). It validates framing, component/table declarations, and marker bounds, but does not decode entropy-coded image data.
+- The default dimension table reflects verified upload support as of the date above, never a guarantee. Apple-published upcoming sizes are separate; a different missing new size produces a false error (extend via config), and a retired size can produce a false pass.
 - A malformed app preview with a `moov` atom larger than 64 MB is rejected to keep validation memory-bounded.
 
 ## Validation
 
 ```bash
-npm run lint   # typecheck + tests
-npm test       # node --test
-npm run build  # compile dist/
+npm run typecheck
+npm test
+npm run build
+npm run test:pack       # pack, install, strict-typecheck, and run a consumer
+npm --prefix web test
+npm --prefix web run build
 ```
+
+`.github/workflows/ci.yml` runs these gates on Node 24 and also proves the local
+composite Action accepts a conforming fixture and rejects a nonconforming one.
 
 ## Design
 
@@ -265,9 +288,10 @@ Release history, including which changes can flip a run's result, is in
 
 ## Roadmap
 
-- [x] App preview checks: duration, per-device-size count, resolution, format, codec/container compatibility, and file size via zero-dependency MP4/MOV atom parsing.
-- [x] Fixture-backed app-preview H.264 profile/level, audio, and frame-rate checks. Bit rate and interlacing are [deliberately out of scope](#two-documented-requirements-screenproof-does-not-check); rotation carries no Apple requirement to enforce.
-- [x] `tRNS`-chunk PNG transparency detection.
+- [x] Hardened PNG/JPEG headers and real-media app-preview codec/PCM parsing against the audited false-pass corpus.
+- [x] Explicit report gates and named unverified metadata checks without changing `LintReport.ok`.
+- [x] Packed TypeScript declaration consumer plus root, web, and composite-Action CI gates.
+- [x] Source-dated current and upcoming screenshot tables, including iPhone Duo and current Apple Watch labels.
 
 ## Maintainer
 

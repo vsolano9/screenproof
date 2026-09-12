@@ -106,9 +106,9 @@ export function renderHuman(report: LintReport, options: HumanOptions = {}): str
   return lines.join("\n");
 }
 
-/** Process exit code: non-zero on errors, or on warnings when strict. */
+/** Process exit code from the effective gate, with a strict override for callers that compute a non-strict report. */
 export function exitCode(report: LintReport, strict: boolean): number {
-  if (report.errorCount > 0) return 1;
+  if (report.gate === "fail") return 1;
   if (strict && report.warningCount > 0) return 1;
   return 0;
 }

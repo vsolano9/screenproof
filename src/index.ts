@@ -11,6 +11,7 @@ export {
   classify,
   DEFAULT_CLASSES,
   nearestValidSize,
+  UPCOMING_CLASSES,
   VERIFIED_ON,
 } from "./dimensions.ts";
 export { parseImageHeader } from "./imageheader.ts";

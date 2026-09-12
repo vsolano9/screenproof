@@ -125,6 +125,9 @@ test("exit codes: 0 clean, 1 errors, 1 warnings under strict only", () => {
   assert.equal(exitCode(report([WARNING]), false), 0);
   assert.equal(exitCode(report([WARNING]), true), 1);
   assert.equal(exitCode(report([INFO]), true), 0);
+  const strictWarning = report([WARNING]);
+  strictWarning.gate = "fail";
+  assert.equal(exitCode(strictWarning, false), 1);
 });
 
 test("report-level warnings render the warning marker and file name, not the error glyph", () => {

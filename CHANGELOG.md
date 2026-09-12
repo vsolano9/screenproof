@@ -6,6 +6,56 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## Unreleased
+
+### Added
+
+- Reports now expose an effective `gate` (`pass`, `pass-with-warnings`, or
+  `fail`) and list unavailable frame-rate, H.264, audio-codec, and PCM-depth
+  measurements in `unverifiedChecks`; `ok` retains its no-error meaning.
+- Published packages include declarations for `screenproof` and
+  `screenproof/browser`. A packed strict-TypeScript/runtime consumer and one
+  Node 24 workflow gate root tests, web tests/build, and positive/negative
+  composite-Action fixtures.
+- The browser inspector adds Copy JSON, Download JSON, clear/reset, and a CLI
+  handoff, plus paired audit-tree regressions and a small real late-`moov`
+  H.264/AAC control.
+- `UPCOMING_CLASSES` records Apple-published iPhone Duo outer and inner display
+  dimensions separately from the currently uploadable default table.
+
+### Changed
+
+- **A tree that passed 0.6.0 can fail this release.** PNG alpha/transparency is
+  now an error by default; malformed PNG/JPEG headers, disguised MP3 audio, and
+  unsupported 64-bit PCM no longer pass their corresponding checks.
+- App-preview audio validation reads the MPEG-4 audio object type and QuickTime
+  sound-description version/format flags instead of trusting the `mp4a` sample
+  entry or a single nominal bit-depth field.
+- Screenshot provenance was re-verified on 2026-09-12. Apple Watch labels now
+  include Ultra 4, Series 12, and SE 3; iPhone Duo sizes remain outside default
+  validation until Apple upload availability and fastlane compatibility are
+  verified.
+- CLI image reads use a bounded 1 MiB header. Browser reads run two files
+  concurrently, seek late `moov` metadata within a 64 MiB limit, reject
+  over-500 MB previews before payload reads, and cap cumulative slices at
+  128 MiB.
+- The browser verdict consumes the report gate for PASS, PASS WITH WARNINGS,
+  and FAIL, and discloses unknown-metadata checks separately.
+
+### Fixed
+
+- CLI and browser scans now share flat/locale detection, hidden-directory
+  handling, nonrecursive locale scans, and missing-media diagnostics. Browser
+  folder selection strips exactly the chosen root.
+- Browser traversal and payload reads share one error boundary and operation
+  identity: stale selections cannot replace newer reports, failures restore
+  controls, and native chooser buttons remain visibly keyboard-focusable with
+  accurate disabled styling.
+- Strict human output now agrees with its failing exit status; quiet mode hides
+  report-level info findings; config rejects inherited object-property names.
+- Browser product copy, singular error grammar, canonical metadata, favicon,
+  title, and system monospace fallback were corrected.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added

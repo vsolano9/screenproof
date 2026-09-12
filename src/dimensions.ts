@@ -2,22 +2,22 @@
  * Apple's App Store screenshot device classes: the accepted exact pixel sizes
  * per device, and the logic to classify an image into a class.
  *
- * Sources (both fetched and cross-checked on 2026-08-23):
+ * Sources (both fetched and cross-checked on 2026-09-12):
  * - `apple`: App Store Connect screenshot specifications reference page.
  * - `deliver`: fastlane deliver's `app_screenshot.rb` resolution mapping,
- *   which is what actually gates a `deliver` upload.
+ *   which is what currently gates a `deliver` upload.
  *
- * The shipped table is the union of both sources. It is pinned by a snapshot
- * test (`fixtures/dimensions-snapshot.json`) and extendable per project via
- * `config.dimensions` without waiting for a release, because Apple adds new
- * device sizes with new hardware.
+ * `DEFAULT_CLASSES` is the union of both currently uploadable sources.
+ * `UPCOMING_CLASSES` records Apple-published sizes that App Store Connect says
+ * will become uploadable later; they are intentionally not accepted by the
+ * default classifier. Both tables are pinned by snapshot tests.
  */
 
 import type { DeviceClass, DimensionOverrides, Orientation, Size } from "./types.ts";
 
-export const VERIFIED_ON = "2026-08-23";
+export const VERIFIED_ON = "2026-09-12";
 
-const SOURCES = ["apple", "deliver"];
+const VERIFIED_SOURCES = ["apple", "deliver"];
 
 function sizes(pairs: [number, number][]): Size[] {
   return pairs.map(([width, height]) => ({ width, height }));
@@ -29,6 +29,7 @@ function device(
   platform: DeviceClass["platform"],
   portrait: [number, number][],
   landscape: [number, number][],
+  sources: string[] = VERIFIED_SOURCES,
 ): DeviceClass {
   return {
     id,
@@ -37,7 +38,7 @@ function device(
     portrait: sizes(portrait),
     landscape: sizes(landscape),
     verifiedOn: VERIFIED_ON,
-    sources: [...SOURCES],
+    sources: [...sources],
   };
 }
 
@@ -95,12 +96,28 @@ export const DEFAULT_CLASSES: readonly DeviceClass[] = [
   device("visionpro", "Apple Vision Pro", "visionpro",
     [],
     [[3840, 2160]]),
-  device("watch-ultra3", "Apple Watch Ultra 3", "watch", [[422, 514]], []),
-  device("watch-ultra", "Apple Watch Ultra/Ultra 2", "watch", [[410, 502]], []),
-  device("watch-s10", "Apple Watch Series 10/11", "watch", [[416, 496]], []),
-  device("watch-s7", "Apple Watch Series 7/8/9", "watch", [[396, 484]], []),
-  device("watch-s4", "Apple Watch Series 4/5/6/SE", "watch", [[368, 448]], []),
-  device("watch-s3", "Apple Watch Series 3", "watch", [[312, 390]], []),
+  device("watch-ultra3", "Apple Watch Ultra 4/Ultra 3", "watch", [[422, 514]], []),
+  device("watch-ultra", "Apple Watch Ultra 2/Ultra", "watch", [[410, 502]], []),
+  device("watch-s10", "Apple Watch Series 12/11/10", "watch", [[416, 496]], []),
+  device("watch-s7", "Apple Watch Series 9/8/7", "watch", [[396, 484]], []),
+  device("watch-s4", "Apple Watch Series 6/5/4/SE 3/SE 2/SE", "watch", [[368, 448]], []),
+  device("watch-s3", "Apple Watch Series 3/2/1", "watch", [[312, 390]], []),
+];
+
+/**
+ * Sizes Apple documents for iPhone Duo while noting that App Store Connect
+ * asset upload support will arrive later. These are discoverable without
+ * silently treating them as currently uploadable.
+ */
+export const UPCOMING_CLASSES: readonly DeviceClass[] = [
+  device("iphone-duo-outer", "iPhone Duo outer display (upcoming)", "iphone",
+    [[1398, 2034]],
+    [[2034, 1398]],
+    ["apple"]),
+  device("iphone-duo-inner", "iPhone Duo inner display (upcoming)", "iphone",
+    [[2007, 2853]],
+    [[2853, 2007]],
+    ["apple"]),
 ];
 
 function hasSize(deviceClass: DeviceClass, width: number, height: number): boolean {
