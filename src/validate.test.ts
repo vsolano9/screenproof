@@ -121,14 +121,23 @@ test("screenshot-format fires on unparseable files", () => {
   assert.match(findings[0]!.message, /cannot parse image header: truncated PNG/);
 });
 
-test("screenshot-png-alpha warns on alpha PNGs", () => {
+test("screenshot-png-alpha errors on any declared PNG transparency by default", () => {
   const scan = scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736, true), png("02.png", "en-US", 1260, 2736)])]);
   const report = validate(scan, defaultConfig());
   const findings = byRule(report, "screenshot-png-alpha");
   assert.equal(findings.length, 1);
-  assert.equal(findings[0]!.severity, "warning");
+  assert.equal(findings[0]!.severity, "error");
   assert.equal(findings[0]!.file, "01.png");
-  assert.match(findings[0]!.message, /declares transparency/);
+  assert.match(findings[0]!.message, /PNG alpha channels and transparency are not allowed/);
+  assert.equal(report.ok, false);
+});
+
+test("screenshot-png-alpha severity overrides remain effective", () => {
+  const scan = scanResult([localeScan("en-US", [png("01.png", "en-US", 1260, 2736, true)])]);
+  const warning = validate(scan, rules({ "screenshot-png-alpha": "warning" }));
+  assert.equal(byRule(warning, "screenshot-png-alpha")[0]!.severity, "warning");
+  assert.equal(warning.ok, true);
+  assert.deepEqual(byRule(validate(scan, rules({ "screenshot-png-alpha": "off" })), "screenshot-png-alpha"), []);
 });
 
 test("screenshot-unknown-dimensions errors with a nearest-size suggestion", () => {
@@ -160,6 +169,17 @@ test("screenshot-count-over combines orientations within a class", () => {
 
   const ten = eleven.slice(0, 10);
   assert.equal(byRule(validate(scanResult([localeScan("en-US", ten)]), defaultConfig()), "screenshot-count-over").length, 0);
+});
+
+test("screenshot-count-over keeps fastlane near-miss iPad filenames in the 13-inch bucket", () => {
+  const files = [
+    ...Array.from({ length: 6 }, (_, i) => png(`ipad_pro_129-${i}.png`, "en-US", 2048, 2732)),
+    ...Array.from({ length: 6 }, (_, i) => png(`plain-${i}.png`, "en-US", 2048, 2732)),
+  ];
+  const report = validate(scanResult([localeScan("en-US", files)]), defaultConfig());
+  const findings = byRule(report, "screenshot-count-over");
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /12 screenshots for iPad 13-inch/);
 });
 
 test("unknown-dimension files do not count toward the class limit", () => {
@@ -331,8 +351,8 @@ test("report assembly: counts, ok flags, deterministic order, mode copied", () =
   ]);
   const report = validate(scan, defaultConfig());
   assert.equal(report.mode, "locale");
-  assert.equal(report.errorCount, 1);
-  assert.equal(report.warningCount, 2);
+  assert.equal(report.errorCount, 2);
+  assert.equal(report.warningCount, 1);
   assert.equal(report.infoCount, 0);
   assert.equal(report.ok, false);
   assert.deepEqual(report.locales.map((l) => l.locale), ["de-DE", "en-US"]);
