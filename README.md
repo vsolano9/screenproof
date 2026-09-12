@@ -226,6 +226,15 @@ const report = inspectBrowserFixtures([{ name: file.name, bytes }]);
 `inspectBrowserFixtures` performs no I/O. Callers choose how bytes enter memory;
 the hosted inspector reads browser `File` objects locally.
 
+The browser and CLI use the same flat/locale folder rules: known top-level locale
+folders select locale mode; folders-only trees also select locale mode so unknown
+locales are reported. Hidden folders are ignored, and nested folders inside a
+locale are reported rather than recursively inspected. Selecting a folder treats
+that folder as the root (select its parent to validate its locale name).
+Browser file inputs cannot represent empty directories, so a completely empty
+locale folder cannot be diagnosed individually. An empty or text-only selection
+does not produce a clean result.
+
 
 ## Flat mode
 

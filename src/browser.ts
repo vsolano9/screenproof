@@ -1,105 +1,44 @@
 import { parseImageHeader } from "./imageheader.ts";
-import { fileExtension, IMAGE_EXTENSIONS, PREVIEW_EXTENSIONS, VIDEO_EXTENSIONS } from "./media.ts";
-import { isKnownLocale } from "./locales.ts";
+import { fileExtension, PREVIEW_EXTENSIONS } from "./media.ts";
 import { parsePreviewHeader } from "./previewheader.ts";
 import { defaultConfig } from "./rules.ts";
-import type { Config, Finding, LintReport, LocaleScan, PreviewFile, ScanResult, ScreenshotFile } from "./types.ts";
+import { fileTree, planScan } from "./scan-tree.ts";
+import type { LintReport, ScanResult } from "./types.ts";
 import { validate } from "./validate.ts";
 
 export interface BrowserFixtureInput {
   /** Basename shown in findings. */
   name: string;
-  /** Optional relative folder path, such as `en-US/01.png`. */
+  /** Path relative to the selected root, such as `en-US/01.png`. */
   path?: string;
   bytes: Uint8Array;
   /** Original file size when `bytes` contains only a bounded read. */
   sizeBytes?: number;
 }
 
-/**
- * Inspect already-read browser files with the same parsers, rules, severities,
- * and Apple-style messages as the CLI. This function performs no I/O.
- */
+/** Inspect already-read browser files with the CLI's tree policy and validators. No I/O. */
 export function inspectBrowserFixtures(inputs: readonly BrowserFixtureInput[]): LintReport {
   const config = defaultConfig();
-  const visible = inputs
-    .map((input) => ({
-      ...input,
-      path: (input.path ?? input.name).replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+|\/+$/g, ""),
-    }))
-    .filter((input) => !input.name.startsWith("."));
-  const mode = visible.some((input) => input.path.includes("/")) ? "locale" : "flat";
-  const diagnostics: Finding[] = [];
-
-  if (visible.length === 0) {
-    diagnostics.push({
-      locale: "",
-      rule: "missing-screenshots",
-      severity: "error",
-      message: "screenshots folder is empty",
-    });
-  }
-
-  const grouped = new Map<string, BrowserFixtureInput[]>();
-  for (const input of visible) {
-    const slash = input.path.indexOf("/");
-    const locale = mode === "locale" && slash >= 0 ? input.path.slice(0, slash) : "";
-    const group = grouped.get(locale) ?? [];
-    group.push(input);
-    grouped.set(locale, group);
-  }
-
-  const locales: LocaleScan[] = [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([locale, entries]) => buildLocaleScan(locale, entries, mode, config));
-  const scan: ScanResult = { root: "browser", mode, locales, diagnostics };
+  const files = new Map(inputs.map(input => [
+    (input.path ?? input.name).replaceAll("\\", "/").replace(/^\.\//, "").replace(/^\/+|\/+$/g, ""), input,
+  ]));
+  const tree = fileTree([...files.keys()]);
+  const plan = planScan("browser", [...tree.keys()], path => tree.get(path)!, config);
+  const scan: ScanResult = {
+    root: plan.root, mode: plan.mode, diagnostics: plan.diagnostics,
+    locales: plan.locales.map(locale => ({
+      locale: locale.locale, isKnownLocale: locale.isKnownLocale, unexpectedFiles: locale.unexpectedFiles,
+      files: locale.images.map(path => ({ path, name: path.split("/").at(-1)!, locale: locale.locale, parse: parseImageHeader(files.get(path)!.bytes) })),
+      previews: locale.previews.map(path => {
+        const input = files.get(path)!;
+        const extension = fileExtension(path);
+        const extensionSupported = PREVIEW_EXTENSIONS.has(extension);
+        return { path, name: path.split("/").at(-1)!, locale: locale.locale,
+          sizeBytes: input.sizeBytes ?? input.bytes.byteLength, extensionSupported,
+          parse: extensionSupported ? parsePreviewHeader(input.bytes) : { ok: false as const, reason: `unsupported app-preview extension ${extension}` },
+        };
+      }),
+    })),
+  };
   return validate(scan, config);
 }
-
-function buildLocaleScan(
-  locale: string,
-  entries: readonly BrowserFixtureInput[],
-  mode: ScanResult["mode"],
-  config: Config,
-): LocaleScan {
-  const files: ScreenshotFile[] = [];
-  const previews: PreviewFile[] = [];
-  const unexpectedFiles: string[] = [];
-
-  for (const input of entries) {
-    const extension = fileExtension(input.name);
-    if (IMAGE_EXTENSIONS.has(extension)) {
-      files.push({
-        path: input.path ?? input.name,
-        name: input.name,
-        locale,
-        parse: parseImageHeader(input.bytes),
-      });
-      continue;
-    }
-    if (VIDEO_EXTENSIONS.has(extension)) {
-      const extensionSupported = PREVIEW_EXTENSIONS.has(extension);
-      previews.push({
-        path: input.path ?? input.name,
-        name: input.name,
-        locale,
-        sizeBytes: input.sizeBytes ?? input.bytes.byteLength,
-        extensionSupported,
-        parse: extensionSupported
-          ? parsePreviewHeader(input.bytes)
-          : { ok: false, reason: `unsupported app-preview extension ${extension}` },
-      });
-      continue;
-    }
-    unexpectedFiles.push(input.name);
-  }
-
-  return {
-    locale,
-    isKnownLocale: mode === "flat" || isKnownLocale(locale, config),
-    files,
-    previews,
-    unexpectedFiles,
-  };
-}
-
