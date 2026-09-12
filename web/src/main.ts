@@ -1,6 +1,7 @@
-import { inspectBrowserFixtures, type BrowserFixtureInput } from "../../src/browser.ts";
+import { inspectBrowserFixtures } from "../../src/browser.ts";
 import type { Finding, LintReport } from "../../src/types.ts";
-import { Inspection, readDrop, selectedPath } from "./intake.ts";
+import { Inspection, readDrop } from "./intake.ts";
+import { readFiles } from "./file-read.ts";
 
 import "./tokens.generated.css";
 import "./styles.css";
@@ -117,9 +118,7 @@ const dropZone = requiredElement<HTMLDivElement>("#drop-zone");
 const inspection = new Inspection({
   start: beginInspection,
   complete: async (files, current) => {
-    const inputs = await Promise.all(files.map(async (file): Promise<BrowserFixtureInput> => ({
-      name: file.name, path: selectedPath(file), bytes: new Uint8Array(await file.arrayBuffer()), sizeBytes: file.size,
-    })));
+    const inputs = await readFiles(files, current);
     if (current()) renderReport(inspectBrowserFixtures(inputs), inputs.map(input => input.path ?? input.name));
   },
   error: renderReadError,

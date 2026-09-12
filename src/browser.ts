@@ -28,7 +28,7 @@ export function inspectBrowserFixtures(inputs: readonly BrowserFixtureInput[]): 
     root: plan.root, mode: plan.mode, diagnostics: plan.diagnostics,
     locales: plan.locales.map(locale => ({
       locale: locale.locale, isKnownLocale: locale.isKnownLocale, unexpectedFiles: locale.unexpectedFiles,
-      files: locale.images.map(path => ({ path, name: path.split("/").at(-1)!, locale: locale.locale, parse: parseImageHeader(files.get(path)!.bytes) })),
+      files: locale.images.map(path => ({ path, name: path.split("/").at(-1)!, locale: locale.locale, parse: parseImageHeader(files.get(path)!.bytes, files.get(path)!.sizeBytes) })),
       previews: locale.previews.map(path => {
         const input = files.get(path)!;
         const extension = fileExtension(path);

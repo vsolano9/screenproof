@@ -11,6 +11,7 @@ import { makePng } from "./test-support/images.ts";
 
 // Paths reproduce the audit's browser/{textonly,nested,mixed,hidden} trees.
 for (const [label, paths, mode, count, rules] of [
+  ["empty", [], "flat", 0, ["missing-screenshots"]],
   ["textonly", ["note.txt"], "flat", 0, ["missing-screenshots", "screenshot-unexpected-file"]],
   ["nested", ["en-US/archive/01.png"], "locale", 0, ["screenshot-locale-empty", "screenshot-unexpected-file"]],
   ["mixed", ["01.png", "misc/02.png"], "flat", 1, []],
