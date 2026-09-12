@@ -228,3 +228,27 @@ test("rejects unsupported lossless and differential JPEG frame variants", () => 
     assert.match(expectFail(jpeg), /unsupported JPEG frame type/);
   }
 });
+
+test("bounded PNG parsing can stop before a valid IDAT payload", () => {
+  const prefix = Uint8Array.from(makePng(100, 50).slice(0, 41));
+  prefix.set(new Uint8Array([0x00, 0x0f, 0x42, 0x40]), 33);
+  const result = parseImageHeader(prefix, 1_000_045);
+  assert.equal(result.ok, true, result.ok ? undefined : result.reason);
+  if (result.ok) assert.equal(result.info.hasAlpha, false);
+});
+
+test("bounded PNG parsing still requires pre-IDAT transparency chunks", () => {
+  const prefix = makePng(100, 50, { colorType: 3, transparency: true }).slice(0, 56);
+  assert.match(expectFail(prefix), /truncated PNG/);
+  const result = parseImageHeader(prefix, 1_000_000);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /truncated PNG/);
+});
+
+test("bounded PNG parsing rejects an IDAT that exceeds the original file", () => {
+  const prefix = Uint8Array.from(makePng(100, 50).slice(0, 41));
+  prefix.set(new Uint8Array([0x00, 0x0f, 0x42, 0x40]), 33);
+  const result = parseImageHeader(prefix, 500_000);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /file bounds/);
+});
