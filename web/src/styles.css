@@ -288,9 +288,8 @@ main {
   display: block;
   width: 100%;
   height: auto;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center right;
-  mix-blend-mode: multiply;
 }
 .workspace {
   display: grid;
@@ -1712,15 +1711,6 @@ footer a {
   }
 }
 
-/* Preserve the full custom illustration without recoloring or clipping its labels. */
-.hero-art img {
-  object-fit: contain;
-  mix-blend-mode: normal;
-  mask-image:
-    linear-gradient(to right, transparent, #000 4%, #000 97%, transparent),
-    linear-gradient(to bottom, transparent, #000 12%, #000 78%, transparent);
-  mask-composite: intersect;
-}
 @media (min-width: 981px) {
   .compact {
     font-size: 11px;

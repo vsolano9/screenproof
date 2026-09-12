@@ -32,10 +32,13 @@ Axe WCAG A/AA checks reported zero violations on the tested desktop and mobile w
 
 ## Custom hero asset (2026-09-12)
 
-Source: the user-approved `screenproof_asset_validation_pipeline.png` (2172 x 724).
-Production: `web/public/validation-stack.webp`, 1344 x 448, 27,374 bytes.
-The full 3:1 composition is preserved, with no cropping, recoloring or added copy. CSS fades only the outer background into the existing hero surface.
+Source: the user-approved transparent `screenproof_validation_pipeline.png` (2135 x 737, RGBA), SHA-256 `5e71b9122ec12ab853d4259706044ebac9b61d7668144d44cb6f87bed6b122db`.
+Production: `web/public/validation-stack-transparent.webp`, 1344 x 464, RGBA, 123,982 bytes, SHA-256 `d0b625f794dfc9599da15d1f70a9df80769b555ea6909f1e5c35b9a6cc2ab788`.
+The prepared WebP preserves the full transparent composition with no cropping, recoloring, added copy or new artwork generation. Its original conversion used Lanczos resizing, WebP quality 88, method 6, alpha quality 100 and exact=True. Native alpha now places the art on the existing light-blue hero surface; no CSS masks or background blending attenuate it.
+Vercel's public asset response uses `max-age=0, must-revalidate`, and the build config adds no cache override. The distinct transparent filename also avoids reusing the older opaque asset's cache key; the obsolete asset is removed.
 The illustration depicts screenshot/video metadata checks; it is decorative,
 not a live verdict, and remains hidden from assistive technology with empty alt.
 The panorama is centered in the desktop art area and hidden at 1100px or below to keep it clear of the hero copy and preserve the compact mobile workflow.
 No validator, package version, npm release or release tags change in this update.
+
+Transparent replacement verification: 19 existing web tests and the production build passed. Chrome browser renders at 320, 390, 768, 980, 1100, 1101, 1280, 1440 and 1586px had no horizontal overflow. All three examples and Clear were exercised at 320, 390 and 1586px. The established light-only design remains unchanged under a dark system preference; desktop and 320px reduced-motion captures are included in `web/receipts/hero-transparent-*.png`.
