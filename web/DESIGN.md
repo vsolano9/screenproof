@@ -5,7 +5,7 @@ Approved direction: Victor's light/blue Screenproof concept, 2026-09-12.
 ## Visual system
 White panels on a cool light-blue page; navy type; blue primary actions.
 Native HTML/CSS/SVG interface, 8-14px corner radii and thin blue-gray borders.
-The approved hero artwork is reused, not regenerated. No screenshot is used as the interactive UI.
+The hero uses the approved custom Screenproof Validation Stack illustration, replacing the generic phone artwork. No screenshot is used as the interactive UI.
 Header, compact hero, three benefits, two-column inspector, coverage and CLI follow the approved composition.
 Mobile order: intake, report, coverage, CLI. Artwork hides on narrow screens.
 
@@ -29,3 +29,13 @@ Checked responsive layouts at 1280, 768, 390 and 320px with no horizontal overfl
 Visually inspected final desktop and mobile screenshots.
 Fixed 320px export-toolbar overflow, annotation cropping, encoding and contrast defects.
 Axe WCAG A/AA checks reported zero violations on the tested desktop and mobile warning states; this is not a complete accessibility certification.
+
+## Custom hero asset (2026-09-12)
+
+Source: the user-approved `screenproof_asset_validation_pipeline.png` (2172 x 724).
+Production: `web/public/validation-stack.webp`, 1344 x 448, 27,374 bytes.
+The full 3:1 composition is preserved, with no cropping, recoloring or added copy. CSS fades only the outer background into the existing hero surface.
+The illustration depicts screenshot/video metadata checks; it is decorative,
+not a live verdict, and remains hidden from assistive technology with empty alt.
+The panorama is centered in the desktop art area and hidden at 1100px or below to keep it clear of the hero copy and preserve the compact mobile workflow.
+No validator, package version, npm release or release tags change in this update.
