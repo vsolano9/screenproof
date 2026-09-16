@@ -40,8 +40,9 @@ when the underlying enabled-rule gate passes.
 
 ## Requirements
 
-The CLI and package consumer are tested on Linux and Windows in CI. macOS is
-also exercised locally. File-symlink tests require the corresponding OS
+The CLI and package consumer support Linux, Windows, and macOS. Run the local
+validation commands below on the platforms relevant to a change; record which
+platforms were actually tested. File-symlink tests require the corresponding OS
 permissions; Windows directory junctions are tested independently.
 
 Node.js 24 or newer, and zero runtime dependencies. The published package ships compiled JavaScript, so `npx screenproof` and `npm install` just work with no build step on your side.
@@ -305,6 +306,8 @@ Flat mode runs the file-level checks only (dimensions, format, alpha, preview si
 ## Validation
 
 ```bash
+npm ci --include=dev
+npm ci --include=dev --prefix web
 npm run typecheck
 npm test
 npm run build
@@ -313,8 +316,14 @@ npm --prefix web test
 npm --prefix web run build
 ```
 
-`.github/workflows/ci.yml` runs these gates on Node 24 and also proves the local
-composite Action accepts a conforming fixture and rejects a nonconforming one.
+Run these gates locally on Node 24 or newer. This repository does not run hosted
+GitHub Actions workflows; adding or re-enabling hosted automation requires explicit
+maintainer approval. Report local results separately from any historical CI results.
+
+The distributable `action.yml` remains available for downstream users. To check
+its underlying CLI locally, run `node src/cli.ts fixtures/action/good` (expected
+exit 0) and `node src/cli.ts fixtures/action/bad` (expected exit 1). These fixture
+checks do not claim to exercise the GitHub-hosted composite Action runtime.
 
 ## Design
 
@@ -329,7 +338,7 @@ Release history, including which changes can flip a run's result, is in
 
 - [x] Hardened PNG/JPEG headers and real-media app-preview codec/PCM parsing against the audited false-pass corpus.
 - [x] Explicit report gates and named unverified metadata checks without changing `LintReport.ok`.
-- [x] Packed TypeScript declaration consumer plus root, web, and composite-Action CI gates.
+- [x] Packed TypeScript declaration consumer plus local root, web, and Action-input fixture validation.
 - [x] Source-dated current and upcoming screenshot tables, including iPhone Duo and current Apple Watch labels.
 
 ## Maintainer
