@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>screenproof security review · 14 October 2026</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f7fa;--panel:#fff;--ink:#17243b;--muted:#4c5b70;--line:#d4dce8;--accent:#174da0;--good:#116746;--soft:#eaf1fc}
+@media(prefers-color-scheme:dark){:root{--bg:#111820;--panel:#19232e;--ink:#edf3fa;--muted:#b9c9d9;--line:#37495b;--accent:#a3c7ff;--good:#87d9b2;--soft:#23354d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:1040px;margin:auto;padding:48px 24px 64px}header{border-top:5px solid var(--accent);padding-top:22px;margin-bottom:28px}.eyebrow{font-size:.8rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.14;letter-spacing:-.035em;margin:12px 0 18px}h2{font-size:1.25rem;margin:0 0 14px}h3{font-size:1rem;margin:18px 0 6px}p{margin:0 0 12px}a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}code{font: .88em ui-monospace,Consolas,monospace;overflow-wrap:anywhere}.lead{max-width:76ch;color:var(--muted);font-size:1.1rem}.meta{display:flex;gap:8px;flex-wrap:wrap}.meta span{padding:5px 10px;background:var(--soft);border:1px solid var(--line);border-radius:5px;font-size:.85rem}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;margin:20px 0}.good{color:var(--good);font-weight:650}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:.94rem}th{text-align:left;font-weight:650;color:var(--muted)}th,td{padding:12px 10px;vertical-align:top;border-bottom:1px solid var(--line)}th:first-child,td:first-child{padding-left:0}th:last-child,td:last-child{padding-right:0}tbody tr:last-child td{border-bottom:0}ul{padding-left:22px;margin:8px 0}li{margin:8px 0}.small{font-size:.87rem;color:var(--muted)}footer{border-top:1px solid var(--line);padding-top:18px;margin-top:28px;color:var(--muted)}@media(max-width:600px){main{padding:26px 16px 40px}.panel{padding:18px}th,td{padding:10px 8px}table{min-width:640px}.table-wrap{padding-bottom:6px}}
+</style>
+<main>
+<header>
+<div class="eyebrow">screenproof · Security maintenance</div>
+<h1>File boundaries and<br>verification limits.</h1>
+<p class="lead">A bounded review of the existing CLI, media parsers, and browser inspector. The local CLI accepted a valid fixture and rejected wrong dimensions, malformed media, and an invalid rule configuration. This document records that evidence without treating a media linter as a security certificate.</p>
+<div class="meta"><span>14 October 2026</span><span>Release baseline: 0.7.0</span><span>Windows · Node 24.19.0</span></div>
+</header>
+<section class="panel" aria-labelledby="scope">
+<h2 id="scope">Scope and responsibility</h2>
+<p><a href="../MAINTAINERS.md">Victor Solano</a> is the project and security maintainer. This review inspects source at <a href="https://github.com/vsolano9/screenproof/tree/1d27f00583da34c207906750e51f451120b2d6b6"><code>1d27f00583da34c207906750e51f451120b2d6b6</code></a>. The accompanying maintenance change adds documentation and a reporting process; it does not alter executable code or publish a new npm release.</p>
+<p>Inputs include user-chosen media trees, JSON configuration, and browser file selections. Assets to protect are local file contents, process resources, and the integrity of validation reports. The CLI runs with its caller's filesystem permissions; the hosted inspector is client-side software.</p>
+<p class="small">Inspection covered <code>src/scan.ts</code>, <code>config.ts</code>, <code>imageheader.ts</code>, <code>previewfile.ts</code>, <code>previewheader.ts</code>, <code>report.ts</code>, and the browser intake, file-read, report-rendering, and export paths. This is a scoped review, not a claim of an exhaustive vulnerability search.</p>
+</section>
+<section class="panel" aria-labelledby="boundaries">
+<h2 id="boundaries">Inspected trust boundaries</h2>
+<div class="table-wrap" role="region" aria-label="Trust boundaries table" tabindex="0"><table>
+<thead><tr><th>Boundary</th><th>Existing control</th><th>Residual limit</th></tr></thead>
+<tbody>
+<tr><td>Selected tree → filesystem</td><td>Read-only scanning; hidden entries and locale depth are handled by a shared scan plan.</td><td>File symlinks and directory junctions are followed intentionally. The selected root does not contain every possible read.</td></tr>
+<tr><td>Image bytes → header parser</td><td>CLI reads a 1 MiB prefix. PNG/JPEG structural fields and byte bounds are checked; missing metadata is reported.</td><td>No complete image decoding, CRC verification, or malware verdict. A metadata budget can reject an otherwise valid file.</td></tr>
+<tr><td>Preview bytes → container parser</td><td>Atom sizes and parent/file bounds are checked. CLI skips encoded payloads; <code>moov</code> allocation is limited to 64 MiB.</td><td>No overall CLI atom-count, elapsed-time, or file-count budget. Untrusted workloads should run in a restricted process.</td></tr>
+<tr><td>Selected browser files → memory</td><td>Two file readers, 128 MiB cumulative metadata budget, 64 MiB <code>moov</code> limit, and 4,096 top-level atom limit per preview. Oversized previews skip payload reads.</td><td>These checks do not bound the browser's total memory or folder-traversal cost. They are not a sandbox for hostile workloads.</td></tr>
+<tr><td>File names and findings → browser markup</td><td>Dynamic names, paths, and messages pass through HTML escaping; export serializes the report as JSON.</td><td>Reports expose selected names and paths. Review exported reports before sharing. Terminal output is a separate surface.</td></tr>
+<tr><td>JSON config → validation decisions</td><td>Malformed values and unknown rule identifiers are rejected. Rule levels and dimension arrays are validated.</td><td>A valid config may disable rules or extend accepted dimensions. Only use a config you trust.</td></tr>
+<tr><td>Local media → network</td><td>No CLI network or credential integration was found in inspected source. Browser selection parsing and JSON export are local; bundled examples use a fetch path.</td><td>Hosted scripts, hosting configuration, and future changes remain part of the trust model. No live traffic or production hosting audit was performed.</td></tr>
+</tbody></table></div>
+</section>
+<section class="panel" aria-labelledby="observed">
+<h2 id="observed">Observed CLI behavior</h2>
+<p>These checks ran the actual <code>node src/cli.ts … --json</code> entry point on local fixtures and small synthetic malformed files. SHA-256 hashes of the input files matched before and after every scenario.</p>
+<div class="table-wrap" role="region" aria-label="Observed CLI results table" tabindex="0"><table>
+<thead><tr><th>Scenario</th><th>Expected result</th><th>Observed result</th></tr></thead>
+<tbody>
+<tr><td>Existing valid screenshot tree</td><td>Pass, exit 0</td><td class="good">Pass, exit 0; no errors</td></tr>
+<tr><td>Existing 500×500 screenshot fixture</td><td>Dimension error, exit 1</td><td class="good">Fail, exit 1; <code>screenshot-unknown-dimensions</code></td></tr>
+<tr><td>Eight-byte PNG signature and a preview atom extending beyond its file</td><td>Format errors, exit 1</td><td class="good">Fail, exit 1; <code>screenshot-format</code> and <code>preview-format</code></td></tr>
+<tr><td>Configuration with an unknown rule identifier</td><td>Usage/config error, exit 2</td><td class="good">Rejected, exit 2</td></tr>
+</tbody></table></div>
+<p class="small" id="suite-status">The existing root suite completed with 305 passing checks, zero failures, and one Windows-specific skip: POSIX directory-read permissions are unavailable through Windows chmod. The existing browser-model suite completed with 19 passing checks and zero failures. Both ran serially on Node 24.19.0, without a build step. The browser-model suite is not a live browser traffic check. No new tests were authored for this review.</p>
+</section>
+<section class="panel" aria-labelledby="limits">
+<h2 id="limits">What this review does not establish</h2>
+<ul>
+<li>A clean security bill, a CVE, a bug-bounty acceptance, or third-party certification.</li>
+<li>Production network behavior, hosting account security, signing or update authenticity, or current dependency advisory coverage.</li>
+<li>A new compiled or packaged release. The documented baseline remains the existing source and published 0.7.0 release.</li>
+<li>Linux or macOS behavior in this session, complete media decoding, or resource limits beyond the safeguards described above.</li>
+</ul>
+<p>For hostile inputs, limit the process or browser's privileges and resources. For a reachable security defect, preserve a minimal harmless reproduction and report it privately.</p>
+</section>
+<footer>
+<p>Report privately through <a href="https://github.com/vsolano9/screenproof/security/advisories/new">GitHub vulnerability reporting</a> or the contact in <a href="../SECURITY.md">SECURITY.md</a>. Victor owns triage, remediation, release coordination, and reporter credit.</p>
+</footer>
+</main>
+</html>

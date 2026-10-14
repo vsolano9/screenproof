@@ -6,6 +6,15 @@ All notable changes to screenproof are recorded here. The format follows
 `0.x`, a change that can flip a run's result ships in a minor release and is
 called out below.
 
+## Unreleased
+
+### Added
+
+- Named project and security-maintainer responsibilities, a security policy,
+  and an enabled private vulnerability-reporting channel.
+- A source-backed security review documenting local verification and the
+  limits of file, parser, and browser safeguards.
+
 ## 0.7.0 - 2026-09-12
 
 ### Added

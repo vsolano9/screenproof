@@ -345,6 +345,11 @@ Release history, including which changes can flip a run's result, is in
 
 `screenproof` and its metadata sibling [metaproof](https://github.com/vsolano9/metaproof) are built and maintained by [Victor Solano](https://thechosenvictor.com/open-source), who runs them against twelve App Store apps before every submission.
 
+Victor is also the security maintainer for `screenproof`. See
+[MAINTAINERS.md](MAINTAINERS.md) for responsibilities and
+[SECURITY.md](SECURITY.md) for supported versions, private vulnerability
+reporting, and the tool's trust boundaries.
+
 ## License
 
 MIT (c) TheChosenVictor LLC
