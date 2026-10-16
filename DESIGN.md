@@ -175,8 +175,8 @@ Inherits tcv-tui anti-patterns.
 
 | Scenario | Command | Pass criteria |
 | --- | --- | --- |
-| screen-80x24 | `COLUMNS=80 node --test src/report.test.ts` then capture `renderHuman` of a two-locale tree to `_receipts/design-system/screenproof/2026-09-03/screen-80x24-dark.txt` | header, locale scanlines, Summary fit 80 columns; no wrap mid-filename; `tr -cd '\033' \| wc -c` > 0 when color is on |
-| screen-120x40 | same renderer, `COLUMNS=120`, `_receipts/design-system/screenproof/2026-09-03/screen-120x40-dark.txt` | extra width is trailing space, not a new pane; file column still 24 cells |
-| error-state | `renderHuman` of `screenshot-unknown-dimensions` plus a report-level `missing-screenshots` to `_receipts/design-system/screenproof/2026-09-03/error-state-dark.txt` | `✖` and the word `error` and `FAIL` all present; `NO_COLOR=1` capture `error-state-nocolor.txt` contains zero `ESC[` bytes and still carries `error` and `FAIL` |
+| screen-80x24 | `COLUMNS=80 node --test src/report.test.ts` then capture `renderHuman` of a two-locale tree | header, locale scanlines, Summary fit 80 columns; no wrap mid-filename; `tr -cd '\033' \| wc -c` > 0 when color is on |
+| screen-120x40 | same renderer, `COLUMNS=120` | extra width is trailing space, not a new pane; file column still 24 cells |
+| error-state | `renderHuman` of `screenshot-unknown-dimensions` plus a report-level `missing-screenshots` | `✖` and the word `error` and `FAIL` all present; `NO_COLOR=1` capture contains zero `ESC[` bytes and still carries `error` and `FAIL` |
 
-Last verified: 2026-09-03 · receipts `_receipts/design-system/screenproof/2026-09-03/` · `designmd audit` count: 0 before wiring, 0 after.
+Last verified: 2026-09-03 · `designmd audit` count: 0 before wiring, 0 after.
