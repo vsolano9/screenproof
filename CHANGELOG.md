@@ -15,6 +15,14 @@ called out below.
 - A source-backed security review documenting local verification and the
   limits of file, parser, and browser safeguards.
 
+### Security
+
+- The web inspector's build tooling moves to Vite 7.3.7, fixing the Vite
+  dev-server advisories GHSA-9jrq-w75r-8gcw and GHSA-rq7h-c2jc-7f22 and the
+  bundled launch-editor issues GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv and
+  GHSA-r825-w8mm-5pxw, and to source-map-js 1.2.2 (GHSA-68fv-2mgg-jv7q). The
+  published CLI and its dependencies are unchanged.
+
 ## 0.7.0 - 2026-09-12
 
 ### Added
