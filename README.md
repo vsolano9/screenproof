@@ -1,5 +1,8 @@
 # screenproof
 
+**Maintenance status — November 2026:** the released scope is complete. Bug and
+security fixes remain supported; there is no active feature-expansion campaign.
+
 Lint your App Store screenshots and app previews before you submit.
 
 `screenproof` checks a [fastlane `deliver`](https://docs.fastlane.tools/actions/deliver/) `screenshots/` tree (or any folder of media) against Apple's published screenshot and app-preview rules: exact dimensions, format validity, video codec/container compatibility, duration, file size, per-localization counts, and locale-folder hygiene. It runs offline, catches problems before an upload fails late with a vague error, and returns a non-zero exit code so it can gate CI.
@@ -343,7 +346,7 @@ Release history, including which changes can flip a run's result, is in
 
 ## Maintainer
 
-`screenproof` and its metadata sibling [metaproof](https://github.com/vsolano9/metaproof) are built and maintained by [Victor Solano](https://thechosenvictor.com/open-source), who runs them against twelve App Store apps before every submission.
+`screenproof` and its metadata sibling [metaproof](https://github.com/vsolano9/metaproof) were developed by [Victor Solano](https://thechosenvictor.com/open-source) while maintaining a twelve-app portfolio. They remain available as independent open-source utilities.
 
 Victor is also the security maintainer for `screenproof`. See
 [MAINTAINERS.md](MAINTAINERS.md) for responsibilities and
